@@ -1,0 +1,473 @@
+#inlineApp .browsing {
+  margin: 0 !important;
+  font-family: Geneva, Arial, Helvetica, sans-serif;
+}
+.browsing {
+  height: 100%;
+}
+.browsing .browsing-container {
+  height: 100%;
+}
+.browsing .browsing-container .collection {
+  background: #EEE;
+}
+.browsing .browsing-container #breadcrumb {
+  height: 20px;
+  /* width: 100%; */
+  font-size: 0.85em;
+  padding-left: 4pt;
+}
+.browsing .browsing-container #browsing-grid {
+}
+.browsing #browsing-dialog {
+  width: 500px;
+}
+.browsing #browsing-dialog .control-group label {
+  float: left;
+  display: block;
+  width: 120px;
+  text-align: right;
+  margin-right: 1em;
+}
+.dojoxUploaderFileList {
+  height: 300px;
+  width: 100%;
+  overflow: auto;
+}
+.dojoxGridMasterView {
+	max-height:420px;
+	overflow:hidden;
+	overflow-y:auto;
+}
+#browsing-upload-dialog {
+  width: 520px;
+}
+#browsing-upload-dialog p {
+  text-align: center;
+  font-size: 85%;
+}
+#browsing-upload-dialog form.file_upload .file_upload_body {
+  position: relative;
+  overflow: hidden;
+  direction: ltr;
+  cursor: pointer;
+  text-align: center;
+  color: #555;
+  font-weight: bold;
+  -moz-border-radius: 10px;
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+  width: 15em;
+  line-height: 2.5em;
+  border: 3px dashed orange;
+  margin-left: auto;
+  margin-right: auto;
+  height: auto;
+}
+#browsing-upload-dialog form.file_upload .file_upload_body input {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  border: 300px solid transparent;
+  opacity: 0;
+  -ms-filter: 'alpha(opacity=0)';
+  -o-transform: translate(-300px, -300px) scale(10);
+  -moz-transform: translate(-800px, 0) scale(10);
+  cursor: pointer;
+  height: 100%;
+}
+#browsing-upload-dialog form.file_upload .file_upload_body button {
+  display: none;
+}
+#browsing-upload-dialog form.file_upload .file_upload_label {
+  display: block;
+}
+#browsing-upload-dialog form.file_upload .file_upload_body:hover {
+  border: 3px dashed lawngreen;
+}
+#browsing-upload-dialog .overall-progress {
+  position: relative;
+  width: 100%;
+  margin-top: 20px;
+}
+#browsing-upload-dialog .overall-progress .bar {
+  height: 18px;
+  background: url(images/progressbar.gif);
+}
+#browsing-upload-dialog .overall-progress .progress-label {
+  position: absolute;
+  left: 10px;
+  top: 0;
+}
+#browsing-upload-dialog .queue {
+  display: block;
+  width: 100%;
+  height: 160px;
+  overflow: auto;
+  margin: 8px 0;
+  font-size: 85%;
+}
+#browsing-upload-dialog .queue .files {
+  width: 100%;
+  margin: 0;
+}
+#browsing-upload-dialog .queue .files tr td {
+  padding: 4px 6px;
+  text-align: right;
+  border-bottom: 1px solid #E0E0E0;
+}
+#browsing-upload-dialog .queue .files tr td.name {
+  min-width: 120px;
+  font-weight: bold;
+  text-align: left;
+}
+#browsing-upload-dialog .queue .files tr td.progress {
+  width: 180px;
+  margin: 8px auto;
+}
+#browsing-upload-dialog .queue .files tr td.progress .bar {
+  height: 18px;
+  background: url(images/progressbar.gif);
+}
+
+.labelBox {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;     
+}
+
+#browsingStack .dijitContentPane {
+	padding:0px;
+	overflow:hidden;
+}
+#browsingStack .dijitButton {
+  font-size: 0.8em;
+}
+#browsingStack .dojoxGrid {
+  font-size: 0.85em !important;
+  width: 100%;
+}
+#browsingStack .dijitToolbar {
+  height: 30px;
+  padding: 5px 0 0 3px;
+}
+#browsingStack #header {
+  width: 100%;
+  height: 40px;
+}
+#browsingStack #header .dijitButtonNode {
+  background: transparent;
+  border: 0;
+}
+#browsingStack #header #startButton {
+  width: 32px;
+  height: 32px;
+  margin: 3px 0 0 10px;
+  float: left;
+}
+#browsingStack #header #user {
+  margin: 9px 0 0 5px;
+  float: left;
+}
+#browsingStack .form-control {
+  margin: .75em 0;
+}
+#browsingStack .form-control label {
+  width: 75px;
+  float: left;
+  text-align: right;
+  margin-right: 1em;
+}
+#browsingStack .details table {
+  font-size: 1em;
+}
+#browsingStack .details td,
+#browsingStack .details th {
+  text-align: left;
+  padding: 0 10px 0 0;
+  margin: 0;
+  vertical-align: top;
+  font-weight: normal;
+}
+#browsingStack .details .title th {
+  vertical-align: middle;
+}
+#browsingStack .details .title td {
+  font-size: 150%;
+}
+#browsingStack .details ul {
+  list-style: none;
+  margin: 0 0 10px 0;
+  padding: 0;
+}
+#browsingStack .details .actions button {
+  margin-top: 15px;
+}
+#browsingStack #content {
+  min-height: 600px;
+  /*background: rgb(125, 126, 125); */
+  /* Old browsers */
+
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  min-width: 360px;
+}
+#browsingStack #content #splash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #eeeeee;
+  z-index: 999;
+}
+#browsingStack #content #status {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  color: #777;
+}
+#browsingStack #content #inlineAppArea {
+  position: relative;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+  display: none;
+  min-height: 400px;
+  width: 100%;
+  background: #eeeeee;
+  border: 3px solid #6d6e70;
+  -webkit-border-radius: 0px 20px 0px 0px;
+  -moz-border-radius: 0px 20px 0px 0px;
+  border-radius: 0px 20px 0px 0px;
+}
+#browsingStack #content #inlineAppArea #inlineApp {
+  height: 500px;
+}
+#browsingStack #content #inlineAppArea #inlineApp .inline-app {
+  opacity: 0;
+  color: #3f3f40;
+}
+#browsingStack #content #inlineAppArea #inlineApp h1,
+#browsingStack #content #inlineAppArea #inlineApp h2,
+#browsingStack #content #inlineAppArea #inlineApp h3 {
+  color: #0083c9;
+}
+#browsingStack #content #inlineAppArea #inlineClose {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  cursor: pointer;
+  z-index: 100;
+}
+#browsingStack #content #inlineAppArea #inlineAppTitle {
+  background: #6D6E70;
+  color: #efefef;
+  padding: 3px 0 5px 3px;
+  text-align: center;
+}
+#browsingStack #content #appList {
+  margin: 0 0 100px 0;
+  padding: 0;
+  display: inline-block;
+}
+#browsingStack #content #appList li {
+  list-style-type: none;
+  float: left;
+  position: relative;
+  width: 150px;
+  height: 150px;
+  margin: 15px;
+  font-size: 1em;
+  border-radius: 5px;
+  color: #353535;
+}
+#browsingStack #content #appList li button {
+  margin: 0;
+  padding: 0;
+  color: #777777;
+  border: none;
+  width: 150px;
+  height: 150px;
+  background: transparent;
+}
+#browsingStack #content #appList li > button:focus {
+  border: solid 3px #4682b4;
+  border-radius: 5px;
+}
+#browsingStack #content #appList li .actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: none;
+  padding: 4px;
+  background: #c0c0c0;
+  opacity: 0.5;
+}
+#browsingStack #content #appList li .actions button {
+  width: inherit;
+  height: inherit;
+  background: transparent;
+}
+#browsingStack #content #appList li a {
+  width: 130px;
+}
+#browsingStack #content #appList li h3 {
+  width: 100%;
+  font-size: 1.1em;
+  font-weight: normal;
+  color: #777777;
+  display: block;
+  margin-top: 6px;
+}
+#browsingStack #content #appList li button:hover h3 {
+  color: black;
+}
+#browsingStack #content #appList li button img {
+  margin: auto 0 auto 0;
+  padding: 0 10px;
+  max-width: 130px;
+  max-height: 100px;
+}
+#browsingStack #content #appList li .configure {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: transparent;
+}
+#browsingStack #content #appList .appGroup {
+  width: auto;
+  height: auto !important;
+  /*border: thin solid #888888;*/
+
+  margin: 0;
+  /*background: -moz-linear-gradient(top, #CCCCCC 0%,  rgb(238, 238, 238) 100%); */
+  /* FF3.6+ */
+
+  /*background: -webkit-gradient(linear, left top, left bottom, color-stop(0%, rgba(125, 126, 125, 1)), color-stop(100%, rgba(14, 14, 14, 1))); */
+  /* Chrome,Safari4+ */
+
+  /*background: -webkit-linear-gradient(top, rgba(125, 126, 125, 1) 0%, rgba(14, 14, 14, 1) 100%); */
+  /* Chrome10+,Safari5.1+ */
+
+  /*background: -o-linear-gradient(top, rgba(125, 126, 125, 1) 0%, rgba(14, 14, 14, 1) 100%); */
+  /* Opera 11.10+ */
+
+  /*background: -ms-linear-gradient(top, rgba(125, 126, 125, 1) 0%, rgba(14, 14, 14, 1) 100%); */
+  /* IE10+ */
+
+  /*background: linear-gradient(top, rgba(125, 126, 125, 1) 0%, rgba(14, 14, 14, 1) 100%); */
+  /* W3C */
+
+  /*filter: progid:DXImageTransform.Microsoft.gradient(startColorstr = '#7d7e7d', endColorstr = '#0e0e0e', GradientType = 0); */
+  /* IE6-9 */
+
+}
+#browsingStack #content #appList .appGroup ul {
+  padding: 0;
+}
+#browsingStack #content #appList .appGroup ul li {
+  margin: 15px;
+}
+#browsingStack #content #appList .appGroupIcon span {
+  color: #4682b4;
+  font-style: italic;
+}
+#browsingStack #content #appList #exide {
+  font-size: 5.0em;
+  padding-top: 35px;
+  text-align: center;
+  width: 100%;
+  position: relative;
+}
+#browsingStack #content #appList #existIcon {
+  background-color: #cfcfcf;
+}
+#browsingStack #content #appList #existIcon #logo {
+  background: url("../images/existdb.png") no-repeat center center;
+  width: 330px;
+  height: 150px;
+  opacity: 0.8;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25), 0 0 50px rgba(0, 0, 0, 0.1) inset;
+  /* background: #cccccc; */
+
+}
+#browsingStack #content #appList #existIcon #existIconFront button {
+  cursor: pointer;
+}
+#browsingStack #content #appList #existIcon #existIconFront button img {
+  margin: 0;
+  opacity: 0.5;
+}
+#browsingStack #content #appList #existIcon #existIconFront #repoConfigIcon {
+  width: 40px;
+  height: 34px;
+  position: absolute;
+  bottom: 8px;
+  left: 5px;
+  background: transparent;
+}
+#browsingStack #content #appList #existIcon #existIconFront #repoConfigIcon img {
+  width: 36px;
+  height: 36px;
+}
+#browsingStack #content #appList #existIcon #existIconFront #addUploadIcons {
+  /*width: 40px;*/
+
+  /*height: 32px;*/
+
+  position: absolute;
+  right: 5px;
+  bottom: 8px;
+  display: inline-block;
+}
+#browsingStack #content #appList #existIcon #existIconFront #addUploadIcons button {
+  cursor: pointer;
+  opacity: 0.5;
+  background: transparent;
+  width: inherit;
+  height: inherit;
+}
+#browsingStack #content #appList #existIcon #existIconFront #addUploadIcons button img {
+  width: 28px;
+  height: 28px;
+}
+#browsingStack #content #appList #existIconBack {
+  display: none;
+}
+#browsingStack #content #appList #existIconBack .configuration {
+  padding: 10px 15px;
+}
+#browsingStack #content #appList #existIconBack .configuration input {
+  width: 100%;
+}
+#browsingStack #content #appList .backside #logo {
+  display: none;
+}
+#browsingStack #content #appList .backside #existIconBack {
+  display: block;
+  width: 330px;
+  height: 150px;
+  color: #666666;
+  font-size: .8em;
+}
+#browsingStack #content #appList #existIcon.backside #existIconFront #addUploadIcons {
+  display: none;
+}
+#browsingStack #content #appList .twoColumn {
+  width: 330px;
+}
+#browsingStack #content #appList .twoColumn button {
+  width: 330px;
+}
+#browsingStack #inlineApp .shutdown {
+  padding: 20px;
+}
+#browsingStack #inlineApp .shutdown #shutdown-message {
+  color: red;
+  font-size: 125%;
+}
