@@ -1,28 +1,26 @@
-#inlineApp .browsing {
+.dexistCollectionBrowser {
   margin: 0 !important;
   font-family: Geneva, Arial, Helvetica, sans-serif;
-}
-.browsing {
   height: 100%;
 }
-.browsing .browsing-container {
+.dexistCollectionBrowser .browsing-container {
   height: 100%;
 }
-.browsing .browsing-container .collection {
+.dexistCollectionBrowser .browsing-container .collection {
   background: #EEE;
 }
-.browsing .browsing-container #breadcrumb {
+.dexistCollectionBrowser .browsing-container #breadcrumb {
   height: 20px;
   /* width: 100%; */
   font-size: 0.85em;
   padding-left: 4pt;
 }
-.browsing .browsing-container #browsing-grid {
+.dexistCollectionBrowser .browsing-container #browsing-grid {
 }
-.browsing #browsing-dialog {
+.dexistCollectionBrowser #browsing-dialog {
   width: 500px;
 }
-.browsing #browsing-dialog .control-group label {
+.dexistCollectionBrowser #browsing-dialog .control-group label {
   float: left;
   display: block;
   width: 120px;
@@ -470,4 +468,46 @@
 #browsingStack #inlineApp .shutdown #shutdown-message {
   color: red;
   font-size: 125%;
+}
+
+.dexistCollectionBrowser .dijitIcon {
+	width:16px;
+	height:16px;
+	margin: 2px 3px;
+}
+
+.dexistCollectionBrowser .dexistToolbar_arrow_refresh {
+	background-image:url("images/arrow_refresh.png");
+}
+
+.dexistCollectionBrowser .dexistToolbar_database_refresh {
+	background-image:url("images/database_refresh.png");
+}
+
+.dexistCollectionBrowser .dexistToolbar_folder_add {
+	background-image:url("images/folder_add.png");
+}
+
+.dexistCollectionBrowser .dexistToolbar_bin {
+	background-image:url("images/bin.png");
+}
+
+.dexistCollectionBrowser .dexistToolbar_application_form_edit {
+	background-image:url("images/application_form_edit.png");
+}
+
+.dexistCollectionBrowser .dexistToolbar_page_copy {
+	background-image:url("images/page_copy.png");
+}
+
+.dexistCollectionBrowser .dexistToolbar_cut {
+	background-image:url("images/cut.png");
+}
+
+.dexistCollectionBrowser .dexistToolbar_page_paste {
+	background-image:url("images/page_paste.png");
+}
+
+.dexistCollectionBrowser .dexistToolbar_database_add {
+	background-image:url("images/database_add.png");
 }
