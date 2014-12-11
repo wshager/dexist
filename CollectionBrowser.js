@@ -22,6 +22,11 @@ define([
 	"dijit/_WidgetsInTemplateMixin",
 	"dijit/Dialog",
 	"dijit/form/Button",
+	"dgrid/OnDemandGrid",
+	"dgrid/editor",
+	"dgrid/Keyboard",
+	"dgrid/Selection",
+	"dgrid/extensions/DijitRegistry",
 	"dojo/text!./resources/CollectionBrowser.html",
 	"dijit/layout/ContentPane",
 	"dijit/layout/StackContainer",
@@ -36,7 +41,8 @@ define([
 ],
 	function(declare, lang, array, has, dom, domConstruct, domStyle, domGeometry, domForm, 
 			on, query, request, ObjectStore, Memory, Cache, JsonRest, ItemFileWriteStore, 
-			registry, _WidgetBase, _TemplatedMixin, _WidgetsInTemplateMixin, Dialog, Button, template) {
+			registry, _WidgetBase, _TemplatedMixin, _WidgetsInTemplateMixin, Dialog, Button, 
+			OnDemandGrid, editor, Keyboard, Selection, DijitRegistry, template) {
 		
 		var util = {
 			confirm: function(title, message, callback) {
@@ -220,12 +226,11 @@ define([
 				this.loadCSS(require.toUrl("dexist/resources/CollectionBrowser.css"));
 				
 				// json data store
-				var restStore = new JsonRest({ target: "/dashboard/plugins/browsing/contents/" });
-				this.store = new ObjectStore({ objectStore: restStore });
+				this.store = new JsonRest({ target: "/dashboard/plugins/browsing/contents/" });
 
 				/*set up layout*/
 				var layout = [[
-					{name: 'Name', field: 'name', width: '30%'},
+					{label: 'Name', field: 'name', width: '30%'},
 					{name: 'Permissions', field: 'permissions', width: '20%', 'formatter': permissionsFormatter},
 					{name: 'Owner', field: 'owner', width: '10%'},
 					{name: 'Group', field: 'group', width: '10%'},
@@ -233,7 +238,7 @@ define([
 				]];
 
 				/*create a new grid:*/
-				this.grid = new dojox.grid.DataGrid({
+				/*this.grid = new dojox.grid.DataGrid({
 					selectionMode: "multi",
 					structure: layout,
 					autoWidth: false,
@@ -242,30 +247,51 @@ define([
 						self.styleRow(self.grid, row);
 					},
 					escapeHTMLInData: false
-				});
-				
-				this.grid.setStore(this.store, { collection: this.collection });
+				});*/
+				this.grid = new (declare([OnDemandGrid, Keyboard, Selection]))({
+					store: this.store,
+					query: {collection:this.collection},
+					columns: [
+						editor({
+							label: "Name",
+							field: "name",
+							editor: "text",
+							editOn: "click"
+						}),{
+							label: "Permissions",
+							field: "permissions"
+						},{
+							label: "Owner",
+							field: "owner"
+						},{
+							label: "Group",
+							field: "group"
+						},{
+							label: "Last-modified",
+							field: "lastModified"
+						}
+					]
+				},this.browsingContainer);
+				this.grid.startup();
 
-				on(this.grid, "rowDblClick", function(ev) {
-					var item = self.grid.getItem(ev.rowIndex);
-					if (item.isCollection) {
-						self.collection = item.id;
-						// console.debug("collection: ", self.collection);
-						self.breadcrumb.innerHTML = self.collection;
-						self.grid.selection.deselectAll();
-						self.grid.focus.setFocusIndex(0, 0);
-						self.store.close();
-						self.grid.setStore(self.store, { collection: self.collection });
+				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,function(ev) {
+					var row = this.grid.row(ev);
+					var item = row.data;
+					if(item.isCollection) {
+						this.collection = item.id;
+						// console.debug("collection: ", this.collection);
+						this.breadcrumb.innerHTML = this.collection;
+						this.grid.set("query",{collection:this.collection});
 					} else {
 						if(ev.altKey) {
-							self.openResource(item.id);
+							this.openResource(item.id);
 						} else {
-							self.onSelectResource(item.id,item);
+							this.onSelectResource(item.id,item);
 						}
 					}
-				});
+				}));
 
-				on(this.grid, "keyUp", function(e) {
+				/*on(this.grid, "keyUp", function(e) {
 					if (self.grid.edit.isEditing()) {
 						return;
 					}
@@ -282,10 +308,8 @@ define([
 								break;
 						}
 					}
-				});
+				});*/
 
-				this.grid.placeAt(this.browsingContainer);
-				
 				var tools = [{
 					id:"reload",
 					title:"Refresh",
@@ -533,8 +557,6 @@ define([
 				
 				// resizing and grid initialization after plugin becomes visible
 				this.grid.domNode.focus();
-				this.grid.focus.setFocusIndex(0, 0);
-				this.grid.focus.focusGrid();
 				this.resize();
 			},
 
