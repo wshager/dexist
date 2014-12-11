@@ -17,6 +17,9 @@ define([
 	"dojo/store/JsonRest",
 	"dojo/data/ItemFileWriteStore",
 	"dijit/registry",
+	"dijit/_WidgetBase",
+	"dijit/_TemplatedMixin",
+	"dijit/_WidgetsInTemplateMixin",
 	"dijit/Dialog",
 	"dijit/form/Button",
 	"dojo/text!./resources/CollectionBrowser.html",
@@ -33,7 +36,7 @@ define([
 ],
 	function(declare, lang, array, has, dom, domConstruct, domStyle, domGeometry, domForm, 
 			on, query, request, ObjectStore, Memory, Cache, JsonRest, ItemFileWriteStore, 
-			registry, Dialog, Button, template) {
+			registry, _WidgetBase, _TemplatedMixin, _WidgetsInTemplateMixin, Dialog, Button, template) {
 		
 		var util = {
 			confirm: function(title, message, callback) {
@@ -143,12 +146,53 @@ define([
 				return null;	
 			}
 		}
+		
+		function changePage(pageId) {
+			var stack = registry.byId("browsingStack");
+			var page = registry.byId(pageId);
+			stack.selectChild(page);
+		};
+		
+		function setupPropertiesForm(item, self) {
+			
+			registry.byId("resourceName").set("value", item.name);
+			registry.byId("internetMediaType").set("value", item.internetMediaType);
+			registry.byId("created").set("value", item.created);
+			registry.byId("lastModified").set("value", item.lastModified);
+			registry.byId("owner").set("value", item.owner);
+			registry.byId("group").set("value", item.group);
+			
+			//reload the permissions store and grid
+			self.permissionsStore.close();
+			var propertiesStore = new Cache(
+				new JsonRest({
+					target: "/dashboard/plugins/browsing/permissions/" + item.id.replace(/\//g, '...') + "/"
+				}),
+				new Memory()
+			);
+			self.permissionsStore = new ObjectStore({
+				objectStore: propertiesStore
+			});
+			self.permissionsGrid.setStore(self.permissionsStore);
+			
+			
+			//reload the acl store and grid
+			self.aclStore.close();
+			var aclPropertiesStore = new Cache(
+				new JsonRest({
+					target: "/dashboard/plugins/browsing/acl/" + item.id.replace(/\//g, '...') + "/"
+				}),
+				new Memory()
+			);
+			self.aclStore = new ObjectStore({
+				objectStore: aclPropertiesStore
+			});
+			self.aclGrid.setStore(self.aclStore);
 
-		//todo: fix intial value for breadcrumb - currently will be updated when dblclick occurs - when using keyboard it will never updated
-		/**
-		 * Collection browser plugin.
-		 */
-		return declare("dexist.CollectionBrowser", null, {
+		}
+
+		
+		return declare("dexist.CollectionBrowser", [_WidgetBase,_TemplatedMixin,_WidgetsInTemplateMixin], {
 			store: null,
 			grid: null,
 			collection: "/db",
@@ -162,53 +206,18 @@ define([
 			aclGrid: null,
 			container: null,
 			theme:"claro",
+			tools:null,
+			baseClass:"dexistCollectionBrowser",
+			templateString:template,
 			constructor:function(params){
 				lang.mixin(this,params);
 			},
 			startup: function() {
-				if(!this.dialog) this.dialog = new Dialog();
-				this.dialog.set("title","Collection Browser");
-				this.dialog.set("content",lang.replace(template,{path:require.toUrl("dexist/resources")}));
-				var container = this.dialog.containerNode;
-				container.style.padding = "0px";
-				container.style.overflow = "hidden";
-				var div = query(".inline-app", container)[0];
-				dom.byId("breadcrumb").innerHTML = this.collection;
-				this._init();
-				this.dialog.show();
-				var self = this;
-				this.dialog.on("hide",function(){
-					self.close();
-				});
-			},
-			
-			/**
-			 * Dynamically load a CSS stylesheet.
-			 */
-			loadCSS: function(path) {
-				console.debug("loadCSS",path);
-
-				//todo: check this code - still needed?
-				var head = document.getElementsByTagName("head")[0];
-				query("link", head).forEach(function(elem) {
-					var href = elem.getAttribute("href");
-					if (href === path) {
-						// already loaded
-						return;
-					}
-				});
-				var link = document.createElement("link");
-				link.setAttribute("rel", "stylesheet");
-				link.setAttribute("type", "text/css");
-				link.setAttribute("href", path);
-				head.appendChild(link);
-			},
-			
-			_init: function() {
+				if(this._started) return;
 				var self = this;
 				
 				this.loadCSS(require.toUrl("dojox/grid/resources/"+this.theme+"Grid.css"));
-				this.loadCSS(require.toUrl("dconecta/widget/resources/CollectionBrowser.css"));
+				this.loadCSS(require.toUrl("dexist/resources/CollectionBrowser.css"));
 				
 				// json data store
 				var restStore = new JsonRest({ target: "/dashboard/plugins/browsing/contents/" });
@@ -224,19 +233,16 @@ define([
 				]];
 
 				/*create a new grid:*/
-				this.grid = new dojox.grid.DataGrid(
-					{
-						id: 'browsing-grid',
-						selectionMode: "multi",
-						structure: layout,
-						autoWidth: false,
-						autoHeight: true,
-						onStyleRow: function(row) {
-							self.styleRow(self.grid, row);
-						},
-						escapeHTMLInData: false
+				this.grid = new dojox.grid.DataGrid({
+					selectionMode: "multi",
+					structure: layout,
+					autoWidth: false,
+					autoHeight: true,
+					onStyleRow: function(row) {
+						self.styleRow(self.grid, row);
 					},
-					document.createElement('div'));
+					escapeHTMLInData: false
+				});
 				
 				this.grid.setStore(this.store, { collection: this.collection });
 
@@ -245,7 +251,7 @@ define([
 					if (item.isCollection) {
 						self.collection = item.id;
 						// console.debug("collection: ", self.collection);
-						dom.byId("breadcrumb").innerHTML = self.collection;
+						self.breadcrumb.innerHTML = self.collection;
 						self.grid.selection.deselectAll();
 						self.grid.focus.setFocusIndex(0, 0);
 						self.store.close();
@@ -278,11 +284,60 @@ define([
 					}
 				});
 
-				/*append the new grid to the div*/
-				dom.byId("browsing-grid-container").appendChild(this.grid.domNode);
+				this.grid.placeAt(this.browsingContainer);
+				
+				var tools = [{
+					id:"reload",
+					title:"Refresh",
+					icon:"arrow_refresh"
+				},{
+					id:"reindex",
+					title:"Reindex collection",
+					icon:"database_refresh"
+				},{
+					id:"new",
+					title:"New collection",
+					icon:"folder_add"
+				},{
+					id:"delete",
+					title:"Delete resources",
+					icon:"bin"
+				},{
+					id:"properties",
+					title:"Edit owner, groups and permissions",
+					icon:"application_form_edit"
+				},{
+					id:"copy",
+					title:"Copy selected resources",
+					icon:"page_copy"
+				},{
+					id:"cut",
+					title:"Cut selected resources",
+					icon:"cut"
+				},{
+					id:"paste",
+					title:"Paste resources",
+					icon:"page_paste"
+				},{
+					id:"add",
+					title:"Upload resources",
+					icon:"database_add"
+				}];
+				
+				this.tools = {};
+				array.forEach(tools,function(_){
+					var bt = new Button({
+						title:_.title,
+						iconClass:"dexistToolbar_"+_.icon,
+						showLabel:false
+					});
+					this.tools[_.id] = bt;
+					this.toolbar.addChild(bt);
+				},this)
+				
 
-				/* on(dom.byId("browsing-toolbar-properties"), "click", lang.hitch(this, "properties")); */
-				query("#browsing-toolbar-properties").on("click", function(ev) {
+				/* on(this.tools["properties"], "click", lang.hitch(this, "properties")); */
+				this.tools["properties"].on("click", function(ev) {
 					var items = self.grid.selection.getSelected();
 					if(items.length && items.length > 0) {
 						setupPropertiesForm(items[0], self);
@@ -338,12 +393,12 @@ define([
 					changePage("browsingPage");
 				});
 				
-				on(dom.byId("browsing-toolbar-delete"), "click", lang.hitch(this, "del"));
-				on(dom.byId("browsing-toolbar-new"), "click", lang.hitch(this, "createCollection"));
+				on(this.tools["delete"], "click", lang.hitch(this, "del"));
+				on(this.tools["new"], "click", lang.hitch(this, "createCollection"));
 
-				on(dom.byId("browsing-toolbar-add"), "click", lang.hitch(this, "upload"));
+				on(this.tools["add"], "click", lang.hitch(this, "upload"));
 
-				on(dom.byId("browsing-toolbar-copy"), "click", function(ev) {
+				on(this.tools["copy"], "click", function(ev) {
 					ev.preventDefault();
 					var resources = self.getSelected();
 					if (resources) {
@@ -352,7 +407,7 @@ define([
 						self.clipboardCut = false;
 					}
 				});
-				on(dom.byId("browsing-toolbar-cut"), "click", function(ev) {
+				on(this.tools["cut"], "click", function(ev) {
 					ev.preventDefault();
 					var resources = self.getSelected();
 					if (resources) {
@@ -361,9 +416,9 @@ define([
 						self.clipboardCut = true;
 					}
 				});
-				on(dom.byId("browsing-toolbar-paste"), "click", function(ev) {
+				on(this.tools["paste"], "click", function(ev) {
 					ev.preventDefault();
-					if (self.clipboard && self.clipboard.length > 0) {
+					if(self.clipboard && self.clipboard.length > 0) {
 						console.log("Paste: %d resources", self.clipboard.length);
 						request.post("/dashboard/plugins/browsing/contents" + self.collection,{
 							data: { resources: self.clipboard, action: self.clipboardCut ? "move" : "copy" },
@@ -378,9 +433,9 @@ define([
 						});
 					}
 				});
-				on(dom.byId("browsing-toolbar-reload"), "click", lang.hitch(this, "refresh"));
-				on(dom.byId("browsing-toolbar-reindex"), "click", lang.hitch(this, "reindex"));
-				/*on(dom.byId("browsing-toolbar-edit"), "click", lang.hitch(this, function(ev) {
+				on(this.tools["reload"], "click", lang.hitch(this, "refresh"));
+				on(this.tools["reindex"], "click", lang.hitch(this, "reindex"));
+				/*on(this.tools["edit"], "click", lang.hitch(this, function(ev) {
 					var items = this.grid.selection.getSelected();
 					if(items.length && items.length > 0 && !items[0].isCollection) {
 						this.openResource(items[0].id);
@@ -432,19 +487,14 @@ define([
 					{name: ' ', field: 'special', width: '15%', type: dojox.grid.cells.Bool, editable: true }
 				]];
 				
-				this.permissionsGrid = new dojox.grid.DataGrid(
-					{
-						id: 'permissions-grid',
-						store: this.permissionsStore,
-						structure: permissionsLayout,
-						autoWidth: false,
-						autoHeight: true,			 //TODO setting to true seems to solve the problem with them being shown and not having to click refresh, otherwise 12 is a good value
-						selectionMode: "single"
-					},
-					document.createElement('div')
-				);
-				dom.byId("permissions-grid-container").appendChild(this.permissionsGrid.domNode);
-				this.permissionsGrid.startup();
+				this.permissionsGrid = new dojox.grid.DataGrid({
+					store: this.permissionsStore,
+					structure: permissionsLayout,
+					autoWidth: false,
+					autoHeight: true,			 //TODO setting to true seems to solve the problem with them being shown and not having to click refresh, otherwise 12 is a good value
+					selectionMode: "single"
+				});
+				this.permissionsGrid.placeAt(this.permissionsContainer);
 				/* end permissions grid */
 				
 				/* start acl grid */
@@ -466,34 +516,26 @@ define([
 					{name: 'Execute', field: 'execute', width: '10%', type: dojox.grid.cells.Bool, editable: true }
 				]];
 				
-				this.aclGrid = new dojox.grid.EnhancedGrid(
-					{
-						id: 'acl-grid',
-						store: this.aclStore,
-						structure: aclLayout,
-						autoWidth: false,
-						autoHeight: true,			 //TODO setting to true seems to solve the problem with them being shown and not having to click refresh, otherwise 12 is a good value
-						selectionMode: "single",
-						plugins: {
-							menus: {
-								rowMenu:"acl-grid-Menu"
-							}
+				this.aclGrid = new dojox.grid.EnhancedGrid({
+					store: this.aclStore,
+					structure: aclLayout,
+					autoWidth: false,
+					autoHeight: true,			 //TODO setting to true seems to solve the problem with them being shown and not having to click refresh, otherwise 12 is a good value
+					selectionMode: "single",
+					plugins: {
+						menus: {
+							rowMenu:"acl-grid-Menu"
 						}
-					},
-					document.createElement('div')
-				);
-				dom.byId("acl-grid-container").appendChild(this.aclGrid.domNode);
-				this.aclGrid.startup();
+					}
+				});
+				this.aclGrid.placeAt(this.aclContainer);
 				/* end acl grid */
 				
 				// resizing and grid initialization after plugin becomes visible
-				self.resize();
-				self.grid.startup();
-
-				self.grid.domNode.focus();
-				self.grid.focus.setFocusIndex(0, 0);
-				self.grid.focus.focusGrid();
-				self.resize();
+				this.grid.domNode.focus();
+				this.grid.focus.setFocusIndex(0, 0);
+				this.grid.focus.focusGrid();
+				this.resize();
 			},
 
 			getSelected: function(collectionsOnly) {
@@ -565,9 +607,8 @@ define([
 			},
 
 			resize: function() {
-				var box = domGeometry.getContentBox(query(".browsing")[0]);
-				var gridDiv = dom.byId("browsing-grid-container");
-				domStyle.set("browsing-grid", "height", (box.h - gridDiv.offsetTop) + "px");
+				var box = domGeometry.getContentBox(this.domNode);
+				domStyle.set(this.grid.domNode, "height", (box.h - this.browsingContainer.offsetTop) + "px");
 			},
 
 			changeCollection: function(idx) {
@@ -729,50 +770,24 @@ define([
 				array.forEach(widgets, function(widget) {
 					widget.destroyRecursive();
 				});
+			},
+			loadCSS: function(path) {
+				console.debug("loadCSS",path);
+
+				//todo: check this code - still needed?
+				var head = document.getElementsByTagName("head")[0];
+				query("link", head).forEach(function(elem) {
+					var href = elem.getAttribute("href");
+					if (href === path) {
+						// already loaded
+						return;
+					}
+				});
+				var link = document.createElement("link");
+				link.setAttribute("rel", "stylesheet");
+				link.setAttribute("type", "text/css");
+				link.setAttribute("href", path);
+				head.appendChild(link);
 			}
 		});
-		
-		function changePage(pageId) {
-			var stack = registry.byId("browsingStack");
-			var page = registry.byId(pageId);
-			stack.selectChild(page);
-		};
-		
-		function setupPropertiesForm(item, self) {
-			
-			registry.byId("resourceName").set("value", item.name);
-			registry.byId("internetMediaType").set("value", item.internetMediaType);
-			registry.byId("created").set("value", item.created);
-			registry.byId("lastModified").set("value", item.lastModified);
-			registry.byId("owner").set("value", item.owner);
-			registry.byId("group").set("value", item.group);
-			
-			//reload the permissions store and grid
-			self.permissionsStore.close();
-			var propertiesStore = new Cache(
-				new JsonRest({
-					target: "/dashboard/plugins/browsing/permissions/" + item.id.replace(/\//g, '...') + "/"
-				}),
-				new Memory()
-			);
-			self.permissionsStore = new ObjectStore({
-				objectStore: propertiesStore
-			});
-			self.permissionsGrid.setStore(self.permissionsStore);
-			
-			
-			//reload the acl store and grid
-			self.aclStore.close();
-			var aclPropertiesStore = new Cache(
-				new JsonRest({
-					target: "/dashboard/plugins/browsing/acl/" + item.id.replace(/\//g, '...') + "/"
-				}),
-				new Memory()
-			);
-			self.aclStore = new ObjectStore({
-				objectStore: aclPropertiesStore
-			});
-			self.aclGrid.setStore(self.aclStore);
-
-		};
 	});
