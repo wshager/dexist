@@ -273,7 +273,12 @@ define([
 					]
 				},this.browsingContainer);
 				this.grid.startup();
-
+				this.grid.on('dgrid-refresh-complete',lang.hitch(this,function() {
+					this.resize();
+					var p = dijit.getEnclosingWidget(this.domNode.parentNode);
+					p.resize();
+				}));
+						
 				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,function(ev) {
 					var row = this.grid.row(ev);
 					var item = row.data;
