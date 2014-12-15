@@ -12,37 +12,30 @@ define([
 	"dojo/query",
 	"dojo/request",
 	"dojo/data/ObjectStore",
-	"dojo/store/Memory",
-	"dojo/store/Cache",
-	"dojo/store/JsonRest",
-	"dojo/data/ItemFileWriteStore",
+	"dstore/Memory",
+	"dstore/Cache",
+	"dstore/Rest",
 	"dijit/registry",
-	"dijit/_WidgetBase",
-	"dijit/_TemplatedMixin",
-	"dijit/_WidgetsInTemplateMixin",
+	"dijit/layout/ContentPane",
+	"dijit/layout/LayoutContainer",
+	"dijit/layout/StackContainer",
+	"dijit/Toolbar",
 	"dijit/Dialog",
 	"dijit/form/Button",
+	"dijit/form/CheckBox",
+	"dijit/form/Select",
 	"dgrid/OnDemandGrid",
-	"dgrid/editor",
+	"dgrid/Editor",
 	"dgrid/Keyboard",
 	"dgrid/Selection",
 	"dgrid/extensions/DijitRegistry",
-	"dojo/text!./resources/CollectionBrowser.html",
-	"dijit/layout/ContentPane",
-	"dijit/layout/StackContainer",
-	"dijit/layout/StackController",
-	"dojox/grid/DataGrid",
-	"dojox/grid/EnhancedGrid",
-	"dojox/grid/enhanced/plugins/Menu",
-	"dijit/form/CheckBox",
-	"dijit/form/Select",
-	"dijit/Toolbar",
+	"dforma/Builder",
 	"dojo/_base/sniff"
 ],
 	function(declare, lang, array, has, dom, domConstruct, domStyle, domGeometry, domForm, 
-			on, query, request, ObjectStore, Memory, Cache, JsonRest, ItemFileWriteStore, 
-			registry, _WidgetBase, _TemplatedMixin, _WidgetsInTemplateMixin, Dialog, Button, 
-			OnDemandGrid, editor, Keyboard, Selection, DijitRegistry, template) {
+			on, query, request, ObjectStore, Memory, Cache, Rest, 
+			registry, ContentPane, LayoutContainer, StackContainer, Toolbar, Dialog, Button, CheckBox, Select,  
+			OnDemandGrid, Editor, Keyboard, Selection, DijitRegistry, Builder) {
 		
 		var util = {
 			confirm: function(title, message, callback) {
@@ -144,61 +137,9 @@ define([
 			}
 		};
 	
-		function permissionsFormatter(permissions){
-			
-			if(permissions) {
-				return "<span class='permissionsCell'>" + permissions + "</span>";
-			} else {
-				return null;	
-			}
-		}
+		var selection;
 		
-		function changePage(pageId) {
-			var stack = registry.byId("browsingStack");
-			var page = registry.byId(pageId);
-			stack.selectChild(page);
-		};
-		
-		function setupPropertiesForm(item, self) {
-			
-			registry.byId("resourceName").set("value", item.name);
-			registry.byId("internetMediaType").set("value", item.internetMediaType);
-			registry.byId("created").set("value", item.created);
-			registry.byId("lastModified").set("value", item.lastModified);
-			registry.byId("owner").set("value", item.owner);
-			registry.byId("group").set("value", item.group);
-			
-			//reload the permissions store and grid
-			self.permissionsStore.close();
-			var propertiesStore = new Cache(
-				new JsonRest({
-					target: "/dashboard/plugins/browsing/permissions/" + item.id.replace(/\//g, '...') + "/"
-				}),
-				new Memory()
-			);
-			self.permissionsStore = new ObjectStore({
-				objectStore: propertiesStore
-			});
-			self.permissionsGrid.setStore(self.permissionsStore);
-			
-			
-			//reload the acl store and grid
-			self.aclStore.close();
-			var aclPropertiesStore = new Cache(
-				new JsonRest({
-					target: "/dashboard/plugins/browsing/acl/" + item.id.replace(/\//g, '...') + "/"
-				}),
-				new Memory()
-			);
-			self.aclStore = new ObjectStore({
-				objectStore: aclPropertiesStore
-			});
-			self.aclGrid.setStore(self.aclStore);
-
-		}
-
-		
-		return declare("dexist.CollectionBrowser", [_WidgetBase,_TemplatedMixin,_WidgetsInTemplateMixin], {
+		return declare("dexist.CollectionBrowser", [StackContainer], {
 			store: null,
 			grid: null,
 			collection: "/db",
@@ -211,72 +152,65 @@ define([
 			aclStore: null,
 			aclGrid: null,
 			container: null,
-			theme:"claro",
 			tools:null,
 			baseClass:"dexistCollectionBrowser",
-			templateString:template,
-			constructor:function(params){
-				lang.mixin(this,params);
-			},
 			startup: function() {
 				if(this._started) return;
 				var self = this;
 				
-				this.loadCSS(require.toUrl("dojox/grid/resources/"+this.theme+"Grid.css"));
 				this.loadCSS(require.toUrl("dexist/resources/CollectionBrowser.css"));
 				
+				this.browsingPage = new LayoutContainer({
+				});
+				this.propertiesPage = new ContentPane({
+				});
+				this.browsingTop = new ContentPane({
+					region:"top",
+					style:"padding:0"
+				});
+				this.browsingPage.addChild(this.browsingTop);
+				this.toolbar = new Toolbar();
+				this.browsingTop.addChild(this.toolbar);
+				this.breadcrumb = domConstruct.create("div",{
+					"class":"breadcrumb"
+				},this.browsingTop.domNode,"last");
 				// json data store
-				this.store = new JsonRest({ target: "/dashboard/plugins/browsing/contents/" });
+				this.store = new Rest({
+					useRangeHeaders:true,
+					target: "/dashboard/plugins/browsing/contents/"
+				});
 
-				/*set up layout*/
-				var layout = [[
-					{label: 'Name', field: 'name', width: '30%'},
-					{name: 'Permissions', field: 'permissions', width: '20%', 'formatter': permissionsFormatter},
-					{name: 'Owner', field: 'owner', width: '10%'},
-					{name: 'Group', field: 'group', width: '10%'},
-					{name: 'Last-modified', field: 'lastModified', width: '30%'}
-				]];
-
-				/*create a new grid:*/
-				/*this.grid = new dojox.grid.DataGrid({
-					selectionMode: "multi",
-					structure: layout,
-					autoWidth: false,
-					autoHeight: true,
-					onStyleRow: function(row) {
-						self.styleRow(self.grid, row);
-					},
-					escapeHTMLInData: false
-				});*/
-				this.grid = new (declare([OnDemandGrid, Keyboard, Selection]))({
-					store: this.store,
-					query: {collection:this.collection},
-					columns: [
-						editor({
-							label: "Name",
-							field: "name",
-							editor: "text",
-							editOn: "click"
-						}),{
-							label: "Permissions",
-							field: "permissions"
-						},{
-							label: "Owner",
-							field: "owner"
-						},{
-							label: "Group",
-							field: "group"
-						},{
-							label: "Last-modified",
-							field: "lastModified"
+				this.grid = new (declare([OnDemandGrid, Keyboard, Selection, Editor, DijitRegistry]))({
+					region:"center",
+					id:"browsingGrid",
+					collection: this.store.filter({collection:this.collection}),
+					columns: [{
+						label: "Name",
+						field: "name",
+						editor: "text",
+						editOn: "click",
+						canEdit: function(item, value){
+							return value != "..";
 						}
-					]
-				},this.browsingContainer);
-				this.grid.startup();
+					},{
+						label: "Permissions",
+						field: "permissions"
+					},{
+						label: "Owner",
+						field: "owner"
+					},{
+						label: "Group",
+						field: "group"
+					},{
+						label: "Last-modified",
+						field: "lastModified"
+					}]
+				});
+				this.browsingPage.addChild(this.grid);
 				this.grid.on('dgrid-refresh-complete',lang.hitch(this,function() {
 					this.resize();
 					var p = dijit.getEnclosingWidget(this.domNode.parentNode);
-					p.resize();
+					if(p) p.resize();
 				}));
 						
 				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,function(ev) {
@@ -286,7 +220,7 @@ define([
 						this.collection = item.id;
 						// console.debug("collection: ", this.collection);
 						this.breadcrumb.innerHTML = this.collection;
-						this.grid.set("query",{collection:this.collection});
+						this.grid.set("collection",this.store.filter({collection:this.collection}));
 					} else {
 						if(ev.altKey) {
 							this.openResource(item.id);
@@ -295,7 +229,11 @@ define([
 						}
 					}
 				}));
-
+				this.grid.on("dgrid-select", function(ev){
+					selection = array.map(ev.rows,function(_){
+						return _.data;
+					});
+				});
 				/*on(this.grid, "keyUp", function(e) {
 					if (self.grid.edit.isEditing()) {
 						return;
@@ -317,47 +255,38 @@ define([
 
 				var tools = [{
 					id:"reload",
-					title:"Refresh",
-					icon:"arrow_refresh"
+					title:"Refresh"
 				},{
 					id:"reindex",
-					title:"Reindex collection",
-					icon:"database_refresh"
+					title:"Reindex collection"
 				},{
 					id:"new",
-					title:"New collection",
-					icon:"folder_add"
+					title:"New collection"
 				},{
 					id:"delete",
-					title:"Delete resources",
-					icon:"bin"
+					title:"Delete resources"
 				},{
 					id:"properties",
-					title:"Edit owner, groups and permissions",
-					icon:"application_form_edit"
+					title:"Edit owner, groups and permissions"
 				},{
 					id:"copy",
-					title:"Copy selected resources",
-					icon:"page_copy"
+					title:"Copy selected resources"
 				},{
 					id:"cut",
-					title:"Cut selected resources",
-					icon:"cut"
+					title:"Cut selected resources"
 				},{
 					id:"paste",
-					title:"Paste resources",
-					icon:"page_paste"
+					title:"Paste resources"
 				},{
 					id:"add",
-					title:"Upload resources",
-					icon:"database_add"
+					title:"Upload resources"
 				}];
 				
 				this.tools = {};
 				array.forEach(tools,function(_){
 					var bt = new Button({
 						title:_.title,
-						iconClass:"dexistToolbar_"+_.icon,
+						iconClass:"dexistToolbar_"+_.id,
 						showLabel:false
 					});
 					this.tools[_.id] = bt;
@@ -366,13 +295,17 @@ define([
 				
 
 				/* on(this.tools["properties"], "click", lang.hitch(this, "properties")); */
-				this.tools["properties"].on("click", function(ev) {
-					var items = self.grid.selection.getSelected();
-					if(items.length && items.length > 0) {
-						setupPropertiesForm(items[0], self);
-						changePage("propertiesPage");
+				this.tools["properties"].on("click", lang.hitch(this,function(ev) {
+					if(selection.length && selection.length > 0) {
+						var item = selection[0];
+						this.form.set("value",item);
+						// this is not an id...
+						this.permissionsStore.target = "/dashboard/plugins/browsing/permissions/"+item.id.replace(/\//g, '...')+"/";
+						// why query for collection again?
+						this.permissionsGrid.set("collection",this.permissionsStore.filter({collection:this.collection}));
+						this.selectChild(this.propertiesPage);
 					}
-				});
+				}));
 				
 				query("#saveProperties").on("click", function(ev) {
 					
@@ -389,13 +322,13 @@ define([
 									self.aclStore.save({
 										onComplete: function() {
 											self.grid._refresh(); //update the main grid
-											changePage("browsingPage");
+											self.selectChild(self.browsingPage);
 										} 
 									});
 								} else {
 									//no changes to ACEs
 									self.grid._refresh(); //update the main grid (as basic permissions have changed)
-									changePage("browsingPage");
+									self.selectChild(self.browsingPage);
 								}
 							}
 						});
@@ -408,18 +341,18 @@ define([
 							self.aclStore.save({
 								onComplete: function() {
 									self.grid._refresh(); //update the main grid
-									changePage("browsingPage");
+									self.selectChild(self.browsingPage);
 								} 
 							});
 						} else {
 							//no changes to ACEs
-							changePage("browsingPage");
+							self.selectChild(self.browsingPage);
 						}
 					}
 				});
 				
 				query("#closeProperties").on("click", function(ev) {
-					changePage("browsingPage");
+					self.selectChild(self.browsingPage);
 				});
 				
 				on(this.tools["delete"], "click", lang.hitch(this, "del"));
@@ -470,71 +403,82 @@ define([
 						this.openResource(items[0].id);
 					}
 				}));*/
-				
+				this.addChild(this.browsingPage);
+				this.addChild(this.propertiesPage);
+				this.grid.startup();
 				//new Uploader(dom.byId("browsing-upload"), lang.hitch(this, "refresh"));
-				
-				/* start permissions grid */
-				this.permissionsStore = new ItemFileWriteStore({
-					data: {
-						label: "class",
-						items: [
-							{
-								"id": "User",
-								read: false,
-								write: false,
-								execute: false,
-								special: false,
-								specialLabel: 'SetUID:'
-							},
-							{
-								"id": "Group",
-								read: false,
-								write: false,
-								execute: false,
-								special: false,
-								specialLabel: 'SetGID:'
-							},
-							{
-								"id": "Other",
-								read: false,
-								write: false,
-								execute: false,
-								special: false,
-								specialLabel: 'Sticky:'
-							}
-						]
-					},
-					clearOnClose: true
+				this.permissionsStore = new Rest({
+					useRangeHeaders:true,
+					target: "/dashboard/plugins/browsing/permissions/"
 				});
-	
-				var permissionsLayout = [[
-					{name: 'Permission', field: 'id', width: '25%'},
-					{name: 'Read', field: 'read', width: '10%', type: dojox.grid.cells.Bool, editable: true },
-					{name: 'Write', field: 'write', width: '10%', type: dojox.grid.cells.Bool, editable: true },
-					{name: 'Execute', field: 'execute', width: '25%', type: dojox.grid.cells.Bool, editable: true },
-					{name: 'Special', field: 'specialLabel', width: '10%', editable: false },
-					{name: ' ', field: 'special', width: '15%', type: dojox.grid.cells.Bool, editable: true }
-				]];
 				
-				this.permissionsGrid = new dojox.grid.DataGrid({
-					store: this.permissionsStore,
-					structure: permissionsLayout,
-					autoWidth: false,
-					autoHeight: true,			 //TODO setting to true seems to solve the problem with them being shown and not having to click refresh, otherwise 12 is a good value
-					selectionMode: "single"
+				this.form = new Builder({
+					data:{
+						controls:[{
+							name:"resourceName",
+							title:"Resource",
+							type:"text",
+							readOnly:true
+						},{
+							name:"internetMediaType",
+							title:"Internet Media Type",
+							type:"text",
+							readOnly:true
+						},{
+							name:"created",
+							type:"text",
+							readOnly:true
+						},{
+							name:"lastModified",
+							title:"Last Modified",
+							type:"text",
+							readOnly:true
+						},{
+							name:"owner",
+							type:"text",
+							trim:true
+						},{
+							name:"group",
+							type:"text",
+							trim:true
+						},{
+							name:"permissions",
+							type:"list",
+							add:false,
+							edit:false,
+							remove:false,
+							columns: [{
+								label: "Permission",
+								field: "id",
+								editor: "checkbox"
+							},{
+								label: "Read",
+								field: "read",
+								editor: "checkbox"
+							},{
+								label: "Write",
+								field: "write",
+								editor: "checkbox"
+							},{
+								label: "Execute",
+								field: "execute",
+								editor: "checkbox"
+							},{
+								label: "Special",
+								field: "special",
+								editor: "checkbox"
+							}]
+						}]
+					}
 				});
-				this.permissionsGrid.placeAt(this.permissionsContainer);
-				/* end permissions grid */
+				this.form.startup().then(lang.hitch(this,function(widgets){
+					this.permissionsGrid = widgets["permissions"].grid;
+				}));
+				this.propertiesPage.addChild(this.form);
+				
 				
 				/* start acl grid */
-				this.aclStore = new ItemFileWriteStore({
-					data: {
-						label: "index",
-						identifier: "index",
-						items: []
-					},
-					clearOnClose: true
-				});
+				/*this.aclStore = new Memory();
 	
 				var aclLayout = [[
 					{name: 'Target', field: 'target', width: '20%'},
@@ -543,9 +487,9 @@ define([
 					{name: 'Read', field: 'read', width: '10%', type: dojox.grid.cells.Bool, editable: true },
 					{name: 'Write', field: 'write', width: '10%', type: dojox.grid.cells.Bool, editable: true },
 					{name: 'Execute', field: 'execute', width: '10%', type: dojox.grid.cells.Bool, editable: true }
-				]];
+				]];*/
 				
-				this.aclGrid = new dojox.grid.EnhancedGrid({
+				/*this.aclGrid = new dojox.grid.EnhancedGrid({
 					store: this.aclStore,
 					structure: aclLayout,
 					autoWidth: false,
@@ -557,19 +501,18 @@ define([
 						}
 					}
 				});
-				this.aclGrid.placeAt(this.aclContainer);
+				this.aclGrid.placeAt(this.aclContainer);*/
 				/* end acl grid */
 				
 				// resizing and grid initialization after plugin becomes visible
-				this.grid.domNode.focus();
-				this.resize();
+				this.grid.focus();
+				this.inherited(arguments);
 			},
 
 			getSelected: function(collectionsOnly) {
-				var items = this.grid.selection.getSelected();
-				if (items.length && items.length > 0) {
+				if(selection.length && selection.length > 0) {
 					var resources = [];
-					array.forEach(items, function(item) {
+					array.forEach(selection, function(item) {
 						if (!collectionsOnly || item.isCollection)
 							resources.push(item.id);
 					});
@@ -577,33 +520,6 @@ define([
 				}
 				return null;
 			},
-
-			/*
-			properties: function() {
-				var self = this;
-				var items = self.grid.selection.getSelected();
-				if (items.length && items.length > 0) {
-					var resources = [];
-					array.forEach(items, function(item) {
-						resources.push(item.id);
-					});
-					var title = resources.length == 1 ? resources[0] : "selection";
-					request("/dashboard/plugins/browsing/properties/",{
-						data: { resources: resources }
-					}).then(function(data) {
-						var dlg = registry.byId("browsing-dialog");
-						dlg.set("content", data);
-						dlg.set("title", "Properties for " + title);
-						dlg.show();
-
-						var form = dom.byId("browsing-dialog-form");
-						on(form, "submit", function(ev) {
-							ev.preventDefault();
-							self.applyProperties(dlg, resources);
-						});
-					});
-				}
-			},*/
 
 			applyProperties: function(dlg, resources) {
 				console.debug("applyProperties");
@@ -631,11 +547,6 @@ define([
 					this.store.close();
 					this.grid.setStore(this.store, { collection: this.collection });
 				}
-			},
-
-			resize: function() {
-				var box = domGeometry.getContentBox(this.domNode);
-				domStyle.set(this.grid.domNode, "height", (box.h - this.browsingContainer.offsetTop) + "px");
 			},
 
 			changeCollection: function(idx) {
@@ -730,35 +641,10 @@ define([
 					});
 			},
 			
-			styleRow: function(grid, row) {
-				var item = grid.getItem(row.index);
-				if(item) {
-				
-					if(row.over) {
-						row.customClasses += " dojoxGridRowOver";
-					}
-					
-					if(row.selected) {
-						row.customClasses += " dojoxGridRowSelected";
-					}
-				
-					if(item.isCollection) {
-						if(!row.selected) {
-							row.customClasses = "collectionRow " + row.customClasses;
-						}
-					} else {
-						row.customClasses += " dojoxGridRow";
-						if(row.odd) {
-							row.customClasses += " dojoxGridRowOdd";
-						}
-					}
-				}
-				grid.focus.styleRow(row);
-				grid.edit.styleRow(row);
-			},
 			onSelectResource:function(path){
 				//override!
 			},
+			
 			openResource: function(path) {
 				var exide = window.open("", "eXide");
 				if (exide && !exide.closed) {
@@ -790,14 +676,6 @@ define([
 				}
 			},
 			
-			close: function() {
-				console.log("Closing down");
-				var container = this.dialog.containerNode;
-				var widgets = registry.findWidgets(container);
-				array.forEach(widgets, function(widget) {
-					widget.destroyRecursive();
-				});
-			},
 			loadCSS: function(path) {
 				console.debug("loadCSS",path);
 
