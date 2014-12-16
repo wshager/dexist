@@ -146,12 +146,6 @@ define([
 			clipboard: null,
 			clipboardCut: false,
 			editor: null,
-			contentHeight: 0,
-			permissionsStore : null,
-			permissionsGrid: null,
-			aclStore: null,
-			aclGrid: null,
-			container: null,
 			tools:null,
 			baseClass:"dexistCollectionBrowser",
 			startup: function() {
@@ -177,7 +171,7 @@ define([
 				// json data store
 				this.store = new Rest({
 					useRangeHeaders:true,
-					target: "/dashboard/plugins/browsing/contents/"
+					target: "/collectionbrowser/"
 				});
 
 				this.grid = new (declare([OnDemandGrid, Keyboard, Selection, Editor, DijitRegistry]))({
@@ -194,7 +188,7 @@ define([
 						}
 					},{
 						label: "Permissions",
-						field: "permissions"
+						field: "permissionsString"
 					},{
 						label: "Owner",
 						field: "owner"
@@ -297,63 +291,102 @@ define([
 				/* on(this.tools["properties"], "click", lang.hitch(this, "properties")); */
 				this.tools["properties"].on("click", lang.hitch(this,function(ev) {
 					if(selection.length && selection.length > 0) {
-						var item = selection[0];
-						this.form.set("value",item);
-						// this is not an id...
-						this.permissionsStore.target = "/dashboard/plugins/browsing/permissions/"+item.id.replace(/\//g, '...')+"/";
-						// why query for collection again?
-						this.permissionsGrid.set("collection",this.permissionsStore.filter({collection:this.collection}));
-						this.selectChild(this.propertiesPage);
+						this.store.get(selection[0].id).then(lang.hitch(this,function(item){
+							this.selectChild(this.propertiesPage);
+							this.form.rebuild({
+								controls:[{
+									name:"name",
+									title:"Resource",
+									type:"text",
+									readOnly:true
+								},{
+									name:"internetMediaType",
+									title:"Internet Media Type",
+									type:"text",
+									readOnly:true
+								},{
+									name:"created",
+									type:"text",
+									readOnly:true
+								},{
+									name:"lastModified",
+									title:"Last Modified",
+									type:"text",
+									readOnly:true
+								},{
+									name:"owner",
+									type:"text",
+									trim:true
+								},{
+									name:"group",
+									type:"text",
+									trim:true
+								},{
+									name:"permissions",
+									type:"grid",
+									add:false,
+									edit:false,
+									remove:false,
+									style:"height:200px",
+									columns: [{
+										label: "Permission",
+										field: "id"
+									},{
+										label: "Read",
+										field: "read",
+										editor: "checkbox"
+									},{
+										label: "Write",
+										field: "write",
+										editor: "checkbox"
+									},{
+										label: "Execute",
+										field: "execute",
+										editor: "checkbox"
+									},{
+										label: "Special",
+										field: "special",
+										editor: "checkbox"
+									}]
+								},{
+									name:"acl",
+									type:"grid",
+									style:"height:200px",
+									columns:[{
+										label: "Target",
+										field: "target",
+										width: "20%"
+									},{
+										label: "Subject", 
+										field: "who", 
+										width: "30%"
+									},{
+										label: "Access", 
+										field: "access_type", 
+										width: "20%"
+									},{
+										label: "Read", 
+										field: "read", 
+										width: "10%", 
+										editor: "checkbox"
+									},{
+										label: "Write", 
+										field: "write", 
+										width: "10%", 
+										editor: "checkbox"
+									},{
+										label: "Execute", 
+										field: "execute", 
+										width: "10%", 
+										editor: "checkbox"
+									}]
+								}]
+							}).then(lang.hitch(this,function(widgets){
+								this.form.set("value",item);
+							}));
+						}));
 					}
 				}));
-				
-				query("#saveProperties").on("click", function(ev) {
-					
-					//do we need to save basic permissions?
-					if(self.permissionsStore.isDirty()) {
-					
-						//save basic properties
-						self.permissionsStore.save({
-							onComplete: function() {
-								
-								//do we also need to save ACEs
-								if(self.aclStore.isDirty()) {
-									//save ACEs
-									self.aclStore.save({
-										onComplete: function() {
-											self.grid._refresh(); //update the main grid
-											self.selectChild(self.browsingPage);
-										} 
-									});
-								} else {
-									//no changes to ACEs
-									self.grid._refresh(); //update the main grid (as basic permissions have changed)
-									self.selectChild(self.browsingPage);
-								}
-							}
-						});
-					} else {
-					
-						//do we need to save ACEs?
-						if(self.aclStore.isDirty()) {
-							
-							//save ACEs
-							self.aclStore.save({
-								onComplete: function() {
-									self.grid._refresh(); //update the main grid
-									self.selectChild(self.browsingPage);
-								} 
-							});
-						} else {
-							//no changes to ACEs
-							self.selectChild(self.browsingPage);
-						}
-					}
-				});
-				
-				query("#closeProperties").on("click", function(ev) {
-					self.selectChild(self.browsingPage);
-				});
 				
 				on(this.tools["delete"], "click", lang.hitch(this, "del"));
 				on(this.tools["new"], "click", lang.hitch(this, "createCollection"));
@@ -407,102 +440,21 @@ define([
 				this.addChild(this.propertiesPage);
 				this.grid.startup();
 				//new Uploader(dom.byId("browsing-upload"), lang.hitch(this, "refresh"));
-				this.permissionsStore = new Rest({
-					useRangeHeaders:true,
-					target: "/dashboard/plugins/browsing/permissions/"
-				});
 				
 				this.form = new Builder({
-					data:{
-						controls:[{
-							name:"resourceName",
-							title:"Resource",
-							type:"text",
-							readOnly:true
-						},{
-							name:"internetMediaType",
-							title:"Internet Media Type",
-							type:"text",
-							readOnly:true
-						},{
-							name:"created",
-							type:"text",
-							readOnly:true
-						},{
-							name:"lastModified",
-							title:"Last Modified",
-							type:"text",
-							readOnly:true
-						},{
-							name:"owner",
-							type:"text",
-							trim:true
-						},{
-							name:"group",
-							type:"text",
-							trim:true
-						},{
-							name:"permissions",
-							type:"list",
-							add:false,
-							edit:false,
-							remove:false,
-							columns: [{
-								label: "Permission",
-								field: "id",
-								editor: "checkbox"
-							},{
-								label: "Read",
-								field: "read",
-								editor: "checkbox"
-							},{
-								label: "Write",
-								field: "write",
-								editor: "checkbox"
-							},{
-								label: "Execute",
-								field: "execute",
-								editor: "checkbox"
-							},{
-								label: "Special",
-								field: "special",
-								editor: "checkbox"
-							}]
-						}]
+					cancellable:true,
+					cancel:function(){
+						self.selectChild(self.browsingPage);
+					},
+					submit:function(){
+						if(!this.validate()) return;
+						var data = this.get("value");
+						console.log(data);
+						self.selectChild(self.browsingPage);
 					}
 				});
-				this.form.startup().then(lang.hitch(this,function(widgets){
-					this.permissionsGrid = widgets["permissions"].grid;
-				}));
+				
 				this.propertiesPage.addChild(this.form);
-				
-				
-				/* start acl grid */
-				/*this.aclStore = new Memory();
-	
-				var aclLayout = [[
-					{name: 'Target', field: 'target', width: '20%'},
-					{name: 'Subject', field: 'who', width: '30%'},
-					{name: 'Access', field: 'access_type', width: '20%'},
-					{name: 'Read', field: 'read', width: '10%', type: dojox.grid.cells.Bool, editable: true },
-					{name: 'Write', field: 'write', width: '10%', type: dojox.grid.cells.Bool, editable: true },
-					{name: 'Execute', field: 'execute', width: '10%', type: dojox.grid.cells.Bool, editable: true }
-				]];*/
-				
-				/*this.aclGrid = new dojox.grid.EnhancedGrid({
-					store: this.aclStore,
-					structure: aclLayout,
-					autoWidth: false,
-					autoHeight: true,			 //TODO setting to true seems to solve the problem with them being shown and not having to click refresh, otherwise 12 is a good value
-					selectionMode: "single",
-					plugins: {
-						menus: {
-							rowMenu:"acl-grid-Menu"
-						}
-					}
-				});
-				this.aclGrid.placeAt(this.aclContainer);*/
-				/* end acl grid */
 				
 				// resizing and grid initialization after plugin becomes visible
 				this.grid.focus();
