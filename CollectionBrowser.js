@@ -362,7 +362,7 @@ define([
 										width: "30%"
 									},{
 										label: "Access", 
-										field: "access_type", 
+										field: "access", 
 										width: "20%"
 									},{
 										label: "Read", 
