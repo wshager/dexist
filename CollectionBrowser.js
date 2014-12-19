@@ -328,6 +328,7 @@ define([
 									edit:false,
 									remove:false,
 									style:"height:200px",
+									selectionMode:"none",
 									columns: [{
 										label: "Permission",
 										field: "id"
