@@ -136,7 +136,7 @@ define([
 				dialog.show();
 			}
 		};
-	
+		
 		var selection;
 		
 		return declare("dexist.CollectionBrowser", [StackContainer], {
@@ -147,7 +147,22 @@ define([
 			clipboardCut: false,
 			editor: null,
 			tools:null,
+			target:"/collectionbrowser/db/",
 			baseClass:"dexistCollectionBrowser",
+			updateBreadcrumb:function() {
+				var self = this;
+				this.breadcrumb.innerHTML = "";
+				array.forEach(this.collection.split("/"),function(part,i,parts){
+					if(!part) return;
+					domConstruct.create("a",{
+						innerHTML:part,
+						target: parts.slice(0,i+1).join("/"),
+						onclick:function(){
+							self.refresh(this.target);
+						}
+					},this.breadcrumb);
+				},this);
+			},
 			startup: function() {
 				if(this._started) return;
 				var self = this;
@@ -159,19 +174,30 @@ define([
 				this.propertiesPage = new ContentPane({
 				});
 				this.browsingTop = new ContentPane({
-					region:"top",
-					style:"padding:0"
+					region:"top"
 				});
 				this.browsingPage.addChild(this.browsingTop);
 				this.toolbar = new Toolbar();
 				this.browsingTop.addChild(this.toolbar);
 				this.breadcrumb = domConstruct.create("div",{
-					"class":"breadcrumb"
+					"class":"dexistBreadCrumb"
 				},this.browsingTop.domNode,"last");
+				this.updateBreadcrumb();
 				// json data store
 				this.store = new Rest({
 					useRangeHeaders:true,
-					target: "/collectionbrowser/"
+					target: this.target,
+					createCollection:function(create) {
+						var id = self.collection.replace(/^\/db\/?/,"");
+						return request.post(this.target+id,{
+							data:JSON.stringify({"method":"create-collection","create":create}),
+							handleAs:"json",
+							headers:{
+								"Content-Type":"application/json",
+								"Accept":"application/json"
+							}
+						});
+					}
 				});
 
 				this.grid = new (declare([OnDemandGrid, Keyboard, Selection, Editor, DijitRegistry]))({
@@ -205,15 +231,14 @@ define([
 					this.resize();
 					var p = dijit.getEnclosingWidget(this.domNode.parentNode);
 					if(p) p.resize();
-				}));
-						
+				}));						
 				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,function(ev) {
 					var row = this.grid.row(ev);
 					var item = row.data;
 					if(item.isCollection) {
-						this.collection = item.id;
+						this.collection = "/db/"+item.id;
 						// console.debug("collection: ", this.collection);
-						this.breadcrumb.innerHTML = this.collection;
+						this.updateBreadcrumb();
 						this.grid.set("collection",this.store.filter({collection:this.collection}));
 					} else {
 						if(ev.altKey) {
@@ -280,7 +305,7 @@ define([
 				array.forEach(tools,function(_){
 					var bt = new Button({
 						title:_.title,
-						iconClass:"dexistToolbar_"+_.id,
+						iconClass:"dexistToolbar-"+_.id,
 						showLabel:false
 					});
 					this.tools[_.id] = bt;
@@ -474,8 +499,7 @@ define([
 				return null;
 			},
 
-			applyProperties: function(dlg, resources) {
-				console.debug("applyProperties");
+			/*applyProperties: function(dlg, resources) {
 				var self = this;
 				var form = dom.byId("browsing-dialog-form");
 				var params = domForm.toObject(form);
@@ -493,13 +517,14 @@ define([
 				},function() {
 					util.message("Server Error", "An error occurred while communicating to the server!");
 				});
-			},
+			},*/
 
-			refresh: function() {
-				if (this.store != null) {
-					this.store.close();
-					this.grid.setStore(this.store, { collection: this.collection });
+			refresh: function(collection) {
+				if(collection) {
+					this.collection = collection;
+					this.updateBreadcrumb();
 				}
+				this.grid.set("collection",this.store.filter({collection:this.collection}));
 			},
 
 			changeCollection: function(idx) {
@@ -508,8 +533,7 @@ define([
 				if (item.isCollection) {
 					this.collection = item.id;
 					this.grid.selection.deselectAll();
-					this.store.close();
-					this.grid.setStore(this.store, { collection: this.collection });
+					this.grid.set("collection",this.store.filter({collection:this.collection}));
 					this.grid.focus.setFocusIndex(0, 0);
 				}
 			},
@@ -519,17 +543,11 @@ define([
 				util.input("Create Collection", "Create a new collection",
 					"<label for='name'>Name:</label><input type='text' name='name'/>",
 					function(value) {
-						request.put("/dashboard/plugins/browsing/contents/" + value.name,{
-							data: { "collection": self.collection },
-							handleAs: "json"
-						}).then(function(data) {
+						self.store.createCollection(value.name).then(function(data) {
 							self.refresh();
-							if (data.status != "ok") {
-								util.message("Creating Collection Failed!", "Could not create collection " + value.name);
-							}
 						},
-						function() {
-							util.message("An error occurred", "Failed to create collection " + value.name);
+						function(err) {
+							util.message("Creating Collection Failed!", "Could not create collection &apos;" + value.name+ "&apos;. Server says:<br>"+err.response.xhr.responseText);
 						});
 					}
 				);
