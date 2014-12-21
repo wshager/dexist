@@ -2,7 +2,11 @@
   font-family: Geneva, Arial, Helvetica, sans-serif;
   width: 800px;
   height: 600px;
-  font-size:90%;
+}
+
+.dexistCollectionBrowser .dijitContentPane {
+	overflow: hidden;
+	padding:0;
 }
 
 .dexistCollectionBrowser #browsingGrid .field-name {
@@ -66,14 +70,26 @@
 }
 
 
-.dformaGridContainer .dgrid {
+.dexistCollectionBrowser .dformaGridContainer .dgrid {
 	height:160px;
 }
 
 
-.dexistCollectionBrowser .breadcrumb {
-  height: 10px;
-  padding: 5px;
+.dexistBreadCrumb {
+  height: 16px;
+  padding: 4px;
+}
+
+.dexistBreadCrumb a:hover {
+	color:#aa8899;
+	cursor:pointer;
+	text-decoration: underline;
+}
+
+.dexistBreadCrumb a:before {
+	content:"▸";
+	display:inline-block;
+	margin-left:0.1em;
 }
 
 .dexistCollectionBrowser .dijitIcon {
@@ -82,38 +98,38 @@
 	margin: 2px 3px;
 }
 
-.dexistCollectionBrowser .dexistToolbar_reload {
+.dexistToolbar-reload {
 	background-image:url("images/arrow_refresh.png");
 }
 
-.dexistCollectionBrowser .dexistToolbar_reindex {
+.dexistToolbar-reindex {
 	background-image:url("images/database_refresh.png");
 }
 
-.dexistCollectionBrowser .dexistToolbar_new {
+.dexistToolbar-new {
 	background-image:url("images/folder_add.png");
 }
 
-.dexistCollectionBrowser .dexistToolbar_delete {
+.dexistToolbar-delete {
 	background-image:url("images/bin.png");
 }
 
-.dexistCollectionBrowser .dexistToolbar_properties {
+.dexistToolbar-properties {
 	background-image:url("images/application_form_edit.png");
 }
 
-.dexistCollectionBrowser .dexistToolbar_copy {
+.dexistToolbar-copy {
 	background-image:url("images/page_copy.png");
 }
 
-.dexistCollectionBrowser .dexistToolbar_cut {
+.dexistToolbar-cut {
 	background-image:url("images/cut.png");
 }
 
-.dexistCollectionBrowser .dexistToolbar_paste {
+.dexistToolbar-paste {
 	background-image:url("images/page_paste.png");
 }
 
-.dexistCollectionBrowser .dexistToolbar_add {
+.dexistToolbar-add {
 	background-image:url("images/database_add.png");
 }
