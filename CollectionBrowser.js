@@ -47,7 +47,7 @@ define([
 				var div = domConstruct.create('div', { style: 'width: 400px;' }, dialog.containerNode, "last");
 				var msg = domConstruct.create("p", { innerHTML: message });
 				div.appendChild(msg);
-				var okButton = new button({
+				var okButton = new Button({
 					label: "Yes"
 				});
 				on(okButton, "click", lang.hitch(this, function() {
@@ -58,7 +58,7 @@ define([
 				}));
 				div.appendChild(okButton.domNode);
 	
-				var cancelButton = new button({
+				var cancelButton = new Button({
 					label: "No"
 				});
 				on(cancelButton, "click", lang.hitch(this, function() {
@@ -142,12 +142,12 @@ define([
 		return declare("dexist.CollectionBrowser", [StackContainer], {
 			store: null,
 			grid: null,
+			target:"db/",
 			collection: "/db",
 			clipboard: null,
 			clipboardCut: false,
 			editor: null,
 			tools:null,
-			target:"/collectionbrowser/db/",
 			baseClass:"dexistCollectionBrowser",
 			updateBreadcrumb:function() {
 				var self = this;
@@ -186,11 +186,15 @@ define([
 				// json data store
 				this.store = new Rest({
 					useRangeHeaders:true,
-					target: this.target,
-					createCollection:function(create) {
-						var id = self.collection.replace(/^\/db\/?/,"");
+					target:this.target,
+					rpc:function(id,method,params,callId){
+						var callId = callId || "call-id";
 						return request.post(this.target+id,{
-							data:JSON.stringify({"method":"create-collection","create":create}),
+							data:JSON.stringify({
+								method:method,
+								params:params,
+								id:callId
+							}),
 							handleAs:"json",
 							headers:{
 								"Content-Type":"application/json",
@@ -414,46 +418,24 @@ define([
 					}
 				}));
 				
-				on(this.tools["delete"], "click", lang.hitch(this, "del"));
+				on(this.tools["delete"], "click", lang.hitch(this, "deleteResources"));
 				on(this.tools["new"], "click", lang.hitch(this, "createCollection"));
 
 				on(this.tools["add"], "click", lang.hitch(this, "upload"));
 
 				on(this.tools["copy"], "click", function(ev) {
 					ev.preventDefault();
-					var resources = self.getSelected();
-					if (resources) {
-						console.log("Copy %d resources", resources.length);
-						self.clipboard = resources;
-						self.clipboardCut = false;
-					}
+					self.clipboard = self.getSelected();
+					console.log("Cut %d resources", self.clipboard.length);
+					self.clipboardCut = false;
 				});
 				on(this.tools["cut"], "click", function(ev) {
 					ev.preventDefault();
-					var resources = self.getSelected();
-					if (resources) {
-						console.log("Cut %d resources", resources.length);
-						self.clipboard = resources;
-						self.clipboardCut = true;
-					}
+					self.clipboard = self.getSelected();
+					console.log("Cut %d resources", self.clipboard.length);
+					self.clipboardCut = true;
 				});
-				on(this.tools["paste"], "click", function(ev) {
-					ev.preventDefault();
-					if(self.clipboard && self.clipboard.length > 0) {
-						console.log("Paste: %d resources", self.clipboard.length);
-						request.post("/dashboard/plugins/browsing/contents" + self.collection,{
-							data: { resources: self.clipboard, action: self.clipboardCut ? "move" : "copy" },
-							handleAs: "json"
-						}).then(function(data) {
-							if (data.status != "ok") {
-								util.message("Paste Failed!", "Some resources could not be copied.");
-							}
-							self.refresh();
-						},function() {
-							self.refresh();
-						});
-					}
-				});
+				on(this.tools["paste"], "click", lang.hitch(this,"pasteResources"));
 				on(this.tools["reload"], "click", lang.hitch(this, "refresh"));
 				on(this.tools["reindex"], "click", lang.hitch(this, "reindex"));
 				/*on(this.tools["edit"], "click", lang.hitch(this, function(ev) {
@@ -543,37 +525,47 @@ define([
 				util.input("Create Collection", "Create a new collection",
 					"<label for='name'>Name:</label><input type='text' name='name'/>",
 					function(value) {
-						self.store.createCollection(value.name).then(function(data) {
+						var id = self.collection.replace(/^\/db\/?/,"");
+						self.store.rpc(id,"create-collection",[value.name]).then(function() {
 							self.refresh();
-						},
-						function(err) {
-							util.message("Creating Collection Failed!", "Could not create collection &apos;" + value.name+ "&apos;. Server says:<br>"+err.response.xhr.responseText);
+						},function(err) {
+							util.message("Creating Collection Failed!", "Could not create collection &apos;" + value.name+ "&apos;.<br>Server says: "+err.response.xhr.responseText);
 						});
 					}
 				);
 			},
 
-			del: function(ev) {
+			deleteResources: function(ev) {
 				ev.preventDefault();
 				var self = this;
 				var resources = self.getSelected();
-				if (resources) {
+				if(resources) {
 					util.confirm("Delete Resources?", "Are you sure you want to delete the selected resources?",
 						function() {
-							request.del("/dashboard/plugins/browsing/contents/",{
-								data: { resources: resources },
-								handleAs: "json"
-							}).then(function(data) {
+							self.store.rpc("","delete-resources",[resources]).then(function() {
 								self.refresh();
-								if (data.status != "ok") {
-									util.message("Deletion Failed!", "Some resources could not be deleted.");
-								} else {
-									self.grid.selection.deselectAll();
-								}
-							},function() {
-								util.message("Server error!", "Error while communicating to the server.");
+							},function(err) {
+								util.message("Deletion Failed!", "Resources could not be deleted.<br>Server says: "+err.response.xhr.responseText);
 							});
 						});
+				}
+			},
+			
+			pasteResources:function(ev){
+				ev.preventDefault();
+				if(this.clipboard && this.clipboard.length > 0) {
+					console.log("Paste: %d resources", this.clipboard.length);
+					var id = this.collection.replace(/^\/db\/?/,"");
+					var mthd = this.clipboardCut ? "move-resources" : "copy-resources";
+					this.store.rpc(id,mthd,[this.clipboard]).then(lang.hitch(this,function(){
+						this.clipboard = null
+						this.clipboardCut = false;
+						this.refresh();
+					}),lang.hitch(this,function(err){
+						this.clipboard = null
+						this.clipboardCut = false;
+						util.message("Paste Failed!", "Some resources could not be copied.");
+					}));
 				}
 			},
 
@@ -585,31 +577,26 @@ define([
 
 			reindex: function() {
 				var self = this;
-				var target = this.collection;
+				var id = this.collection.replace(/^\/db\/?/,"");
 				var resources = this.getSelected(true);
 				if (resources && resources.length > 0) {
 					if (resources.length > 1) {
 						util.message("Reindex", "Please select a single collection or none to reindex the current root collection");
 						return;
 					}
-					target = resources[0];
+					id = resources[0];
 				}
 				
-				util.confirm("Reindex collection?", "Are you sure you want to reindex collection " + 
-					target + "?",
-					function() {
-						request.post("/dashboard/plugins/browsing/contents" + target,{
-							data: { action: "reindex" },
-							handleAs: "json"
-						}).then(function(data) {
-							if (data.status != "ok") {
-								util.message("Reindex Failed!", "Reindex of collection " + target + " failed");
-							}
-							self.refresh();
-						},function() {
-							self.refresh();
-						});
+				util.confirm("Reindex collection?", 
+					"Are you sure you want to reindex collection " + id + "?",
+				function() {
+					self.store.rpc(id,"reindex").then(function() {
+						self.refresh();
+					},function() {
+						util.message("Reindex Failed!", "Reindex of collection " + id + " failed");
+						self.refresh();
 					});
+				});
 			},
 			
 			onSelectResource:function(path){
