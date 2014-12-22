@@ -2,5 +2,15 @@
     "name": "dexist",
     "description": "dexist",
     "version": 0.1,
-    "dojoBuild": "dexist.profile.js"
+    "dojoBuild": "dexist.profile.js",
+    "url":"wshager/dexist",
+    "dependencies":{
+        "dojo":"dojo/dojo"
+        "dijit":"dojo/dijit",
+        "dstore":"sitepen/dstore",
+        "dforma":"lagua/dforma",
+        "dgrid":"sitepen/dgrid",
+        "xstyle":"kriszyp/xstyle",
+        "put-selector":"kriszyp/put-selector"
+    }
 }
