@@ -324,6 +324,9 @@ define([
 							this.selectChild(this.propertiesPage);
 							this.form.rebuild({
 								controls:[{
+									name:"id",
+									type:"hidden"
+								},{
 									name:"name",
 									title:"Resource",
 									type:"text",
@@ -457,8 +460,12 @@ define([
 					submit:function(){
 						if(!this.validate()) return;
 						var data = this.get("value");
-						console.log(data);
-						self.selectChild(self.browsingPage);
+						self.store.put(data).then(function(){
+							self.selectChild(self.browsingPage);
+							util.message("Properties updated successfully", "Properties updated");
+						},function(err){
+							util.message("Changing Properties Failed!", "Could not change properties on all resources! <br>Server says: "+err.response.xhr.responseText);
+						});
 					}
 				});
 				
