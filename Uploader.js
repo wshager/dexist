@@ -16,9 +16,14 @@ define([
 function(declare, array, dom, domConstruct, domStyle, query, fx,_WidgetBase,_TemplatedMixin,template, $, fileupload,loadCss) {
     
     return declare("dexist.Uploader",[_WidgetBase,_TemplatedMixin], {
-        templateString:template,
+        url:"/dashboard/plugins/browsing/upload.xql",
+        collection:"/db",
+    	templateString:template,
         baseClass:"dexistUploader",
         errorsFound: false,
+        onDone:function(){
+        	// override
+        },
         postCreate: function() {
         	loadCss(require.toUrl("dexist/resources/Uploader.css"));
             var container = this.domNode;
@@ -68,9 +73,7 @@ function(declare, array, dom, domConstruct, domStyle, query, fx,_WidgetBase,_Tem
                     if (pending < 1) {
                         fx.fadeOut({node: progressDiv, duration: 200}).play();
                         progress = 0;
-                        if (doneCallback) {
-                            doneCallback(self.errorsFound);
-                        }
+                        self.onDone(self.errorsFound);
                     }
                 },
                 fail: function(e, data) {
