@@ -139,7 +139,7 @@ define([
 			}
 		};
 		
-		var selection;
+		var selection = [];
 		
 		return declare("dexist.CollectionBrowser", [StackContainer], {
 			store: null,
@@ -609,12 +609,12 @@ define([
 				}
 				
 				util.confirm("Reindex collection?", 
-					"Are you sure you want to reindex collection " + id + "?",
+					"Are you sure you want to reindex collection /db/" + id + "?",
 				function() {
 					self.store.rpc(id,"reindex").then(function() {
 						self.refresh();
 					},function() {
-						util.message("Reindex Failed!", "Reindex of collection " + id + " failed");
+						util.message("Reindex Failed!", "Reindex of collection /db/" + id + " failed");
 						self.refresh();
 					});
 				});
