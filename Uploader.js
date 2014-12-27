@@ -31,6 +31,7 @@ function(declare, array, dom, domConstruct, domStyle, query, fx,_WidgetBase,_Tem
             var pending = 0;
             var progressDiv = query(".overall-progress", container)[0];
             $(container).fileupload({
+            	dropZone:container,
                 sequentialUploads: true,
                 dataType: "json",
                 add: function(e, data) {
@@ -84,7 +85,7 @@ function(declare, array, dom, domConstruct, domStyle, query, fx,_WidgetBase,_Tem
         },
         
         clear: function() {
-            query(".files", this.container).empty();
+            query(".files", this.domNode).empty();
             this.errorsFound = false;
         }
     });

@@ -31,12 +31,13 @@ define([
 	"dgrid/extensions/DijitRegistry",
 	"dforma/Builder",
 	"./util/load-css",
+	"./Uploader",
 	"dojo/_base/sniff"
 ],
 	function(declare, lang, array, has, dom, domConstruct, domStyle, domGeometry, domForm, 
 			on, query, request, ObjectStore, Memory, Cache, Rest, 
 			registry, ContentPane, LayoutContainer, StackContainer, Toolbar, Dialog, Button, CheckBox, Select,  
-			OnDemandGrid, Editor, Keyboard, Selection, DijitRegistry, Builder, loadCSS) {
+			OnDemandGrid, Editor, Keyboard, Selection, DijitRegistry, Builder, loadCss,Uploader) {
 		
 		var util = {
 			confirm: function(title, message, callback) {
@@ -145,6 +146,7 @@ define([
 			grid: null,
 			target:"db/",
 			collection: "/db",
+			uploadUrl:"/dashboard/plugins/browsing/upload.xql",
 			clipboard: null,
 			clipboardCut: false,
 			editor: null,
@@ -451,7 +453,19 @@ define([
 				this.addChild(this.browsingPage);
 				this.addChild(this.propertiesPage);
 				this.grid.startup();
-				//new Uploader(dom.byId("browsing-upload"), lang.hitch(this, "refresh"));
+				
+				// init uploader
+				this.uploadDlg = new Dialog({
+					title:"Upload Files"
+				});
+				this.uploader = new Uploader({
+					collection:this.collection,
+					url:this.uploadUrl,
+					onDone:function(){
+						self.refresh();
+					}
+				});
+				this.uploadDlg.containerNode.appendChild(this.uploader.domNode);
 				
 				this.form = new Builder({
 					cancellable:true,
@@ -578,9 +592,8 @@ define([
 			},
 
 			upload: function() {
-				dom.byId("browsing-upload-collection").value = this.collection;
-				var uploadDlg = registry.byId("browsing-upload-dialog");
-				uploadDlg.show();
+				this.uploader.set("collection",this.collection);
+				this.uploadDlg.show();
 			},
 
 			reindex: function() {
