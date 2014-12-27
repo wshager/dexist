@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <link rel="stylesheet" href="../../dijit/themes/claro/claro.css"/>
+        <script src="../../dojo/dojo.js" data-dojo-config="async:true,locale:'en-us',paths:{'jquery':'../dexist/util/$','jquery.ui.widget':'../dexist/util/factory'}"></script>
+        <script type="text/javascript">
+			require(["dexist/Uploader"],function(Uploader){
+				var fu = new Uploader({},"fileupload");
+			});
+    	</script>
+    </head>
+    <body class="claro">
+    	<div id="fileupload"></div>
+    </body>
+</html>
