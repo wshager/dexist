@@ -372,7 +372,9 @@ define([
 		}
 		if ( typeof selector === "string" ) {
 			if ( selector[0] === "<" && selector[ selector.length - 1 ] === ">" && selector.length >= 3 ) {
-				return lang.mixin(query(domConstruct.place(selector,context || document.body)), $.fn);
+				var elm = domConstruct.toDom(selector);
+				if(context) domConstruct.place(elm,context);
+				return lang.mixin(query(elm), $.fn);
 			}
 			// hacky test for custom pseudo filters
 			if(selector.match(pseudos)) {
