@@ -442,7 +442,7 @@ define([
 					self.clipboardCut = true;
 				});
 				on(this.tools["paste"], "click", lang.hitch(this,"pasteResources"));
-				on(this.tools["reload"], "click", lang.hitch(this, "refresh"));
+				on(this.tools["reload"], "click", lang.hitch(this, function(){ this.refresh()}));
 				on(this.tools["reindex"], "click", lang.hitch(this, "reindex"));
 				/*on(this.tools["edit"], "click", lang.hitch(this, function(ev) {
 					var items = this.grid.selection.getSelected();
