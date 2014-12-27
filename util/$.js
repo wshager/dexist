@@ -2,6 +2,7 @@ define([
 	"dojo/_base/lang",
 	"dojo/_base/array",
 	"dojo/on",
+	"dojo/aspect",
 	"dojo/request",
 	"dojo/ready",
 	"dojo/query",
@@ -16,7 +17,7 @@ define([
 	"dojo/NodeList-data",
 	"dojo/NodeList-manipulate",
 	"dojo/NodeList-traverse"
-], function(lang,array,on,request,ready,query,Deferred,when,Memory,domGeometry,domConstruct,domStyle,domAttr,domClass) {
+], function(lang,array,on,aspect,request,ready,query,Deferred,when,Memory,domGeometry,domConstruct,domStyle,domAttr,domClass) {
 
 	var magicGuard = function(a){
 		return a.length == 1 && (typeof a[0] == "string");
@@ -30,6 +31,42 @@ define([
 			return module.set(node, name, value);
 		};
 	}
+var rsingleTag = (/^<(\w+)\s*\/?>(?:<\/\1>|)$/);
+
+var rcheckableType = (/^(?:checkbox|radio)$/i);
+
+var whitespace = "[\\x20\\t\\r\\n\\f]";
+var risSimple = /^.[^:#\[\.,]*$/;
+var rneedsContext = new RegExp( "^" + whitespace + "*[>+~]|:(even|odd|eq|gt|lt|nth|first|last)(?:\\(" +
+			whitespace + "*((?:-\\d)?\\d*)" + whitespace + "*\\)|)(?=[^-]|$)", "i" );
+function winnow( elements, qualifier, not ) {
+	if ($.isFunction( qualifier ) ) {
+		return $.grep( elements, function( elem, i ) {
+			/* jshint -W018 */
+			return !!qualifier.call( elem, i, elem ) !== not;
+		});
+
+	}
+
+	if ( qualifier.nodeType ) {
+		return $.grep( elements, function( elem ) {
+			return ( elem === qualifier ) !== not;
+		});
+
+	}
+
+	if ( typeof qualifier === "string" ) {
+		if ( risSimple.test( qualifier ) ) {
+			return $.filter( qualifier, elements, not );
+		}
+
+		qualifier = $.filter( qualifier, elements );
+	}
+
+	return $.grep( elements, function( elem ) {
+		return ( $.inArray( elem, qualifier ) >= 0 ) !== not;
+	});
+}
 	function isElement(obj) {
 		  try {
 		    //Using W3 DOM2 (works for FF, Opera and Chrom)
@@ -116,9 +153,12 @@ define([
 			return false;
 		},
 		is:function(selector){
-			return !!this.filter(function(_){
-				return !!$(selector,_).length;
-			}).length;
+			var x= this.every(function(_){
+				var q = $.query(selector,_);
+				console.log(q)
+				return q.length ? q[0]===_ : false;
+			});
+			return x===true;
 		},
 		attr:function(key,val){
 			var x = attr.apply(this,arguments);
@@ -128,9 +168,6 @@ define([
 		prop:function(key,val){
 			var res = attr.apply(this,arguments);
 			var x = [];
-			array.forEach(res,function(_){
-				if(_) x.push(_);
-			});
 			if(!x.length){
 				this.each(function(){
 					if(this[key]) {
@@ -141,9 +178,12 @@ define([
 			}
 			if(!x.length){
 				this.each(function(){
-					var q = $(key,this);
-					if(q.length) x.push(q[0]);
-				});
+					var q= $(key,this);
+					if(q.length) {
+						x=q[0];
+						return;
+					}	
+				})
 			}
 			return x.length ? x[0] : null;
 		},
@@ -273,21 +313,21 @@ define([
 				( num < 0 ? this[ num + this.length ] : this[ num ] ) :
 
 				// Return all the elements in a clean array
-				slice.call( this );
+				[].slice.call( this );
 		},
 		serializeArray: function() {
 			// Can add propHook for "elements" to filter or add form elements
-			var elements = $.prop( this, "elements" );
-			return elements ? $.makeArray( elements ) : this;
-			elements.filter(function() {
-				var type = this.type;
+			var elements = this.prop( "elements" );
+			elements = elements ? $.makeArray(elements) : _;
+			return elements.filter(function(_) {
+				var type = _.type;
 				// Use .is(":disabled") so that fieldset[disabled] works
-				return this.name && !$( this ).is( ":disabled" ) &&
-					rsubmittable.test( this.nodeName ) && !rsubmitterTypes.test( type ) &&
+				return _.name && !$(_).is( ":disabled" ) &&
+					rsubmittable.test(_.nodeName ) && !rsubmitterTypes.test( type ) &&
 					( this.checked || !rcheckableType.test( type ) );
 			})
-			.map(function( i, elem ) {
-				var val = $( this ).val();
+			.map(function(elem) {
+				var val = $(elem).val();
 
 				return val == null ?
 					null :
@@ -296,7 +336,8 @@ define([
 							return { name: elem.name, value: val.replace( rCRLF, "\r\n" ) };
 						}) :
 						{ name: elem.name, value: val.replace( rCRLF, "\r\n" ) };
-			}).get();
+			})
+			.get();
 		}
 	});
 	$ = query;
@@ -318,6 +359,7 @@ define([
 		return lang.mixin(query.apply(this, arguments), $.fn);
 	}, dojo, {fn: {}});
 	$.each = function(collection, fn){
+		console.log(collection instanceof Array ? "array" : "object")
 		if(collection instanceof Array) {
 			collection.forEach(function(_,i){
 				fn(i,_);
@@ -334,20 +376,41 @@ define([
 	$.noop = function(){};
 	$.Deferred = function(){
 		var d = new Deferred();
-		d.pipe = d.then;
+		d.pipe = function(fn1,fn2) {
+			when(this,function(){
+				fn1.apply(this,arguments);
+			},function(){
+				fn2.apply(this,arguments);
+			});
+			return d;
+		};
+		var _ch = aspect.after(d,"cancel",function(){
+			_ch.remove();
+			if(d.abort) d.abort.apply(d,arguments);
+		});
 		d.promise = function(){
 			return this;
 		}
 		d.done = function(fn){
-			when(d,function(args){
-				fn.apply(this,args)
+			when(this,function(args){
+				fn.apply(this,args);
 			});
+			return this;
 		};
 		d.fail = function(fn){
-			when(d,function(){
+			when(this,function(){
 			},function(args){
 				fn.apply(this,args);
 			});
+			return this;
+		};
+		d.always = function(fn) {
+			when(this,function(){
+				fn.apply(this,arguments);
+			},function(args){
+				fn.apply(this,arguments);
+			});
+			return this;
 		};
 		d.resolveWith = function(obj,args) {
 			return this.resolve.call(obj,args);
@@ -406,13 +469,29 @@ define([
 	};
 	$.extend = function(){
 		var args = Array.prototype.slice.call(arguments);
-		var target = args[0];
+		var target = args.shift();
 		var deep = false;
 		// Handle a deep copy situation
 		if(typeof target === "boolean" ) {
 			deep = args.shift();
 		}
-		return lang.mixin.apply(this,args);
+		while(args.length>0) {
+			var source = args.shift();
+			target = lang.mixin(target,source);
+		}
+		return target;
+	};
+	$.pushStack=function( elems ) {
+
+		// Build a new jQuery matched element set
+		var ret = jQuery.merge( this.constructor(), elems );
+
+		// Add the old object onto the stack (as a reference)
+		ret.prevObject = this;
+		ret.context = this.context;
+
+		// Return the newly-formed element set
+		return ret;
 	};
 	$.inArray = function( elem, arr, i ) {
 		var len;
@@ -452,7 +531,7 @@ define([
 					[ arr ] : arr
 				);
 			} else {
-				push.call( ret, arr );
+				[].push.call( ret, arr );
 			}
 		}
 
@@ -626,17 +705,45 @@ define([
 			context: true
 		}
 	};
+	$.isFunction= function( obj ) {
+		return $.type(obj) === "function";
+	};
+	$.grep=function( elems, callback, invert ) {
+		var callbackInverse,
+			matches = [],
+			i = 0,
+			length = elems.length,
+			callbackExpect = !invert;
+
+		// Go through the array, only saving the items
+		// that pass the validator function
+		for ( ; i < length; i++ ) {
+			callbackInverse = !callback( elems[ i ], i );
+			if ( callbackInverse !== callbackExpect ) {
+				matches.push( elems[ i ] );
+			}
+		}
+
+		return matches;
+	};
 	$.ajax = function( url, options ) {
 		if ( typeof url === "object" ) {
 			options = url;
 			url = options.url;
 		}
+		var method = options.type.toLowerCase() || 'get';
+		var dataType = options.dataType || 'text';
+		var data = options.data;
+		var params = {
+			handleAs : dataType,
+			data: data
+		};
 		var d = new $.Deferred();
-		request(url).then(function(res){
+		request[method](url,params).then(function(res){
 			d.resolve([res,200,{}]);
 		},function(err){
-			d.reject([err.response.xhr,err.response.status])
-		})
+			d.reject([err.response.xhr,err.response.status,err.response.xhr.responseText]);
+		});
 		return d;
 	}
 	return $;
