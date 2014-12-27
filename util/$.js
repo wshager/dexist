@@ -1,6 +1,9 @@
 define([
+	"dojo/_base/declare",
 	"dojo/_base/lang",
 	"dojo/_base/array",
+	"dojo/selector/_loader", 
+	"dojo/selector/_loader!default",
 	"dojo/on",
 	"dojo/aspect",
 	"dojo/request",
@@ -17,7 +20,7 @@ define([
 	"dojo/NodeList-data",
 	"dojo/NodeList-manipulate",
 	"dojo/NodeList-traverse"
-], function(lang,array,on,aspect,request,ready,query,Deferred,when,Memory,domGeometry,domConstruct,domStyle,domAttr,domClass) {
+], function(declare,lang,array,loader, defaultEngine,on,aspect,request,ready,query,Deferred,when,Memory,domGeometry,domConstruct,domStyle,domAttr,domClass) {
 
 	var magicGuard = function(a){
 		return a.length == 1 && (typeof a[0] == "string");
@@ -31,42 +34,6 @@ define([
 			return module.set(node, name, value);
 		};
 	}
-var rsingleTag = (/^<(\w+)\s*\/?>(?:<\/\1>|)$/);
-
-var rcheckableType = (/^(?:checkbox|radio)$/i);
-
-var whitespace = "[\\x20\\t\\r\\n\\f]";
-var risSimple = /^.[^:#\[\.,]*$/;
-var rneedsContext = new RegExp( "^" + whitespace + "*[>+~]|:(even|odd|eq|gt|lt|nth|first|last)(?:\\(" +
-			whitespace + "*((?:-\\d)?\\d*)" + whitespace + "*\\)|)(?=[^-]|$)", "i" );
-function winnow( elements, qualifier, not ) {
-	if ($.isFunction( qualifier ) ) {
-		return $.grep( elements, function( elem, i ) {
-			/* jshint -W018 */
-			return !!qualifier.call( elem, i, elem ) !== not;
-		});
-
-	}
-
-	if ( qualifier.nodeType ) {
-		return $.grep( elements, function( elem ) {
-			return ( elem === qualifier ) !== not;
-		});
-
-	}
-
-	if ( typeof qualifier === "string" ) {
-		if ( risSimple.test( qualifier ) ) {
-			return $.filter( qualifier, elements, not );
-		}
-
-		qualifier = $.filter( qualifier, elements );
-	}
-
-	return $.grep( elements, function( elem ) {
-		return ( $.inArray( elem, qualifier ) >= 0 ) !== not;
-	});
-}
 	function isElement(obj) {
 		  try {
 		    //Using W3 DOM2 (works for FF, Opera and Chrom)
@@ -85,7 +52,9 @@ function winnow( elements, qualifier, not ) {
 	rbracket = /\[\]$/,
 	rCRLF = /\r?\n/g,
 	rsubmitterTypes = /^(?:submit|button|image|reset|file)$/i,
-	rsubmittable = /^(?:input|select|textarea|keygen)/i;
+	rsubmittable = /^(?:input|select|textarea|keygen)/i,
+	rsingleTag = (/^<(\w+)\s*\/?>(?:<\/\1>|)$/),
+	rcheckableType = (/^(?:checkbox|radio)$/i);
 	var class2type = {};
 	array.forEach("Boolean Number String Function Array Date RegExp Object Error".split(" "), function(name) {
 		class2type[ "[object " + name + "]" ] = name.toLowerCase();
@@ -120,17 +89,29 @@ function winnow( elements, qualifier, not ) {
 	};
 	
 	var attr = query.NodeList._adaptWithCondition(getSet(domAttr), magicGuard);
-	lang.extend(query.NodeList,{
+	var NodeList = declare("$.NodeList",[query.NodeList],{
 		ready:ready,
 		add: function(elm){
 			this.push(elm);
 			return this;
 		},
-		data:function(){
-			return this.query.apply(this,arguments)[0];
+		data:function(key,val){
+			if(!this.length) return;
+			var node = this[0];
+			if(!isElement(node)) {
+				if(arguments.length==0){
+					return node;
+				}
+				if(arguments.length>1) {
+					return node[key] = val;
+				} else {
+					return node[key];
+				}
+			}
+			return this.inherited(arguments)[0];
 		},
 		find: function(){
-			return this.query.apply(this,arguments);
+			return query.apply(this,arguments);
 		},
 		each: function(){
 			var args = Array.prototype.slice.call(arguments);
@@ -155,7 +136,6 @@ function winnow( elements, qualifier, not ) {
 		is:function(selector){
 			var x= this.every(function(_){
 				var q = $.query(selector,_);
-				console.log(q)
 				return q.length ? q[0]===_ : false;
 			});
 			return x===true;
@@ -318,8 +298,8 @@ function winnow( elements, qualifier, not ) {
 		serializeArray: function() {
 			// Can add propHook for "elements" to filter or add form elements
 			var elements = this.prop( "elements" );
-			elements = elements ? $.makeArray(elements) : _;
-			return elements.filter(function(_) {
+			elements = elements ? $.makeArray(elements) : this;
+			return new NodeList(elements).filter(function(_) {
 				var type = _.type;
 				// Use .is(":disabled") so that fieldset[disabled] works
 				return _.name && !$(_).is( ":disabled" ) &&
@@ -340,11 +320,55 @@ function winnow( elements, qualifier, not ) {
 			.get();
 		}
 	});
-	$ = query;
+	lang.extend(NodeList,{
+		_NodeListCtor:NodeList
+	})
+	function queryForEngine(engine, NodeList){
+		var query = function(/*String*/ query, /*String|DOMNode?*/ root){
+			// summary:
+			//		Returns nodes which match the given CSS selector, searching the
+			//		entire document by default but optionally taking a node to scope
+			//		the search by. Returns an instance of NodeList.
+			if(typeof root == "string"){
+				root = dom.byId(root);
+				if(!root){
+					return new NodeList([]);
+				}
+			}
+			var results = typeof query == "string" ? engine(query, root) : query ? (query.end && query.on) ? query : [query] : [];
+			if(results.end && results.on){
+				// already wrapped
+				return results;
+			}
+			return new NodeList(results);
+		};
+		query.matches = engine.match || function(node, selector, root){
+			// summary:
+			//		Test to see if a node matches a selector
+			return query.filter([node], selector, root).length > 0;
+		};
+		// the engine provides a filtering function, use it to for matching
+		query.filter = engine.filter || function(nodes, selector, root){
+			// summary:
+			//		Filters an array of nodes. Note that this does not guarantee to return a NodeList, just an array.
+			return query(selector, root).filter(function(node){
+				return array.indexOf(nodes, node) > -1;
+			});
+		};
+		if(typeof engine != "function"){
+			var search = engine.search;
+			engine = function(selector, root){
+				// Slick does it backwards (or everyone else does it backwards, probably the latter)
+				return search(root || document, selector);
+			};
+		}
+		return query;
+	}
+	query = queryForEngine(defaultEngine, NodeList);
 	var pseudos = /:(:?[^ ,:.]+)/g;
 	$ = lang.mixin(function(selector,context){
 		if(arguments.length===0){
-			return lang.mixin(new query.NodeList([]), $.fn);
+			return lang.mixin(new NodeList([]), $.fn);
 		}
 		if ( typeof selector === "string" ) {
 			if ( selector[0] === "<" && selector[ selector.length - 1 ] === ">" && selector.length >= 3 ) {
@@ -359,7 +383,6 @@ function winnow( elements, qualifier, not ) {
 		return lang.mixin(query.apply(this, arguments), $.fn);
 	}, dojo, {fn: {}});
 	$.each = function(collection, fn){
-		console.log(collection instanceof Array ? "array" : "object")
 		if(collection instanceof Array) {
 			collection.forEach(function(_,i){
 				fn(i,_);
@@ -456,8 +479,10 @@ function winnow( elements, qualifier, not ) {
 	$.prop = function(elm,key,value) {
 		return $(elm).prop(key,value);
 	};
-	$.data = function(elm,key,value){
-		return $(elm).data(key,value);
+	$.data = function(){
+		var args = Array.prototype.slice.call(arguments);
+		var elm = args.shift();
+		return $(elm).data.apply($(elm),args);
 	};
 	$.type = function(obj){
 		if ( obj == null ) {
