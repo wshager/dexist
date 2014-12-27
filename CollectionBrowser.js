@@ -30,12 +30,13 @@ define([
 	"dgrid/Selection",
 	"dgrid/extensions/DijitRegistry",
 	"dforma/Builder",
+	"./util/load-css",
 	"dojo/_base/sniff"
 ],
 	function(declare, lang, array, has, dom, domConstruct, domStyle, domGeometry, domForm, 
 			on, query, request, ObjectStore, Memory, Cache, Rest, 
 			registry, ContentPane, LayoutContainer, StackContainer, Toolbar, Dialog, Button, CheckBox, Select,  
-			OnDemandGrid, Editor, Keyboard, Selection, DijitRegistry, Builder) {
+			OnDemandGrid, Editor, Keyboard, Selection, DijitRegistry, Builder, loadCSS) {
 		
 		var util = {
 			confirm: function(title, message, callback) {
@@ -167,7 +168,7 @@ define([
 				if(this._started) return;
 				var self = this;
 				
-				this.loadCSS(require.toUrl("dexist/resources/CollectionBrowser.css"));
+				loadCss(require.toUrl("dexist/resources/CollectionBrowser.css"));
 				
 				this.browsingPage = new LayoutContainer({
 				});
@@ -639,25 +640,6 @@ define([
 				} else {
 					util.message("Open Resource", "Failed to start eXide in new window.");
 				}
-			},
-			
-			loadCSS: function(path) {
-				console.debug("loadCSS",path);
-
-				//todo: check this code - still needed?
-				var head = document.getElementsByTagName("head")[0];
-				query("link", head).forEach(function(elem) {
-					var href = elem.getAttribute("href");
-					if (href === path) {
-						// already loaded
-						return;
-					}
-				});
-				var link = document.createElement("link");
-				link.setAttribute("rel", "stylesheet");
-				link.setAttribute("type", "text/css");
-				link.setAttribute("href", path);
-				head.appendChild(link);
 			}
 		});
 	});
