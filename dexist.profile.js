@@ -24,8 +24,6 @@ var profile = {
 		"async" : 1
 	},
 	"staticHasFeatures" : {
-		//"config-deferredInstrumentation" : 0,
-		//"config-dojo-loader-catches" : 0,
 		"config-tlmSiblingOfDojo" : 1,
 		"dojo-amd-factory-scan" : 1,
 		"dojo-combo-api" : 0,
@@ -74,7 +72,7 @@ var profile = {
 	        boot:true
 	    },
 		"dexist/cb-layer" : {
-			"include" : [ "dexist/CollectionBrowser","dforma/Grid],
+			"include" : [ "dexist/CollectionBrowser","dforma/Grid"],
 			"boot":true
 		}
 	}

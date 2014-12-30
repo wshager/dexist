@@ -5,7 +5,7 @@
     "dojoBuild": "dexist.profile.js",
     "url":"wshager/dexist",
     "dependencies":{
-        "dojo":"dojo/dojo"
+        "dojo":"dojo/dojo",
         "dijit":"dojo/dijit",
         "dstore":"sitepen/dstore",
         "dforma":"lagua/dforma",
