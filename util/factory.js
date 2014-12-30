@@ -3,17 +3,7 @@
 * Includes: widget.js
 * Copyright 2014 jQuery Foundation and other contributors; Licensed MIT */
 
-(function( factory ) {
-	if ( typeof define === "function" && define.amd ) {
-
-		// AMD. Register as an anonymous module.
-		define([ "jquery" ], factory );
-	} else {
-
-		// Browser globals
-		factory( jQuery );
-	}
-}(function( $ ) {
+define(["./$"],function($) {
 /*!
  * jQuery UI Widget 1.11.1
  * http://jqueryui.com
@@ -553,6 +543,6 @@ $.each( { show: "fadeIn", hide: "fadeOut" }, function( method, defaultEffect ) {
 
 var widget = $.widget;
 
+return widget;
 
-
-}));
+});

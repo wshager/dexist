@@ -10,7 +10,7 @@ define([
     "dijit/_TemplatedMixin",
     "dojo/text!./templates/Uploader.html",
     "./util/$",
-    "jQuery-File-Upload/js/jquery.fileupload",
+    "./util/jquery.fileupload",
     "./util/load-css"
 ],
 function(declare, array, dom, domConstruct, domStyle, query, fx,_WidgetBase,_TemplatedMixin,template, $, fileupload,loadCss) {
