@@ -388,6 +388,10 @@ define([
 									name:"acl",
 									type:"grid",
 									style:"height:200px",
+									controller:{
+										type:"select",
+										name:"target"
+									},
 									columns:[{
 										label: "Target",
 										field: "target",
@@ -397,8 +401,8 @@ define([
 										field: "who", 
 										width: "30%"
 									},{
-										label: "Access", 
-										field: "access", 
+										label: "Access Type",
+										field: "access_type", 
 										width: "20%"
 									},{
 										label: "Read", 
@@ -415,7 +419,60 @@ define([
 										field: "execute", 
 										width: "10%", 
 										editor: "checkbox"
-									}]
+									}],
+									schema:{
+										items:[{
+											id:"USER",
+											properties:{
+												who:{
+													title:"Subject",
+													type:"string",
+													required:true
+												},
+												access_type:{
+													title:"Access Type",
+													type:"string",
+													format:"radiogroup",
+													"enum":["ALLOWED","DENIED"],
+													required:true
+												},
+												read:{
+													type:"boolean"
+												},
+												write:{
+													type:"boolean"
+												},
+												execute:{
+													type:"boolean"
+												}
+											}
+										},{
+											id:"GROUP",
+											properties:{
+												who:{
+													title:"Subject",
+													type:"string",
+													required:true
+												},
+												access_type:{
+													title:"Access Type",
+													type:"string",
+													format:"radiogroup",
+													"enum":["ALLOWED","DENIED"],
+													required:true
+												},
+												read:{
+													type:"boolean"
+												},
+												write:{
+													type:"boolean"
+												},
+												execute:{
+													type:"boolean"
+												}
+											}
+										}]
+									}
 								}]
 							}).then(lang.hitch(this,function(widgets){
 								this.form.set("value",item);
