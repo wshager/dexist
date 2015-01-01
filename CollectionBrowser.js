@@ -7,15 +7,16 @@ define([
 	"dojo/dom-construct",
 	"dojo/dom-style",
 	"dojo/dom-geometry",
-	"dojo/dom-form",
 	"dojo/on",
 	"dojo/query",
 	"dojo/request",
-	"dojo/data/ObjectStore",
+	"dojo/date/locale",
+	
 	"dstore/Memory",
 	"dstore/Cache",
 	"dstore/Rest",
-	"dijit/registry",
+	"dstore/legacy/DstoreAdapter",
+	
 	"dijit/layout/ContentPane",
 	"dijit/layout/LayoutContainer",
 	"dijit/layout/StackContainer",
@@ -24,20 +25,28 @@ define([
 	"dijit/form/Button",
 	"dijit/form/CheckBox",
 	"dijit/form/Select",
+	
 	"dgrid/OnDemandGrid",
 	"dgrid/Editor",
 	"dgrid/Keyboard",
 	"dgrid/Selection",
 	"dgrid/extensions/DijitRegistry",
+	
 	"dforma/Builder",
+	"dforma/Grid",
+	"dforma/DateTimeTextBox",
+	"dforma/RadioGroup",
+	
 	"./util/load-css",
 	"./Uploader",
 	"dojo/_base/sniff"
 ],
-	function(declare, lang, array, has, dom, domConstruct, domStyle, domGeometry, domForm, 
-			on, query, request, ObjectStore, Memory, Cache, Rest, 
-			registry, ContentPane, LayoutContainer, StackContainer, Toolbar, Dialog, Button, CheckBox, Select,  
-			OnDemandGrid, Editor, Keyboard, Selection, DijitRegistry, Builder, loadCss,Uploader) {
+	function(declare, lang, array, has, dom, domConstruct, domStyle, domGeometry, on, query, request, locale,  
+			Memory, Cache, Rest, DstoreAdapter,
+			ContentPane, LayoutContainer, StackContainer, Toolbar, Dialog, Button, CheckBox, Select,  
+			OnDemandGrid, Editor, Keyboard, Selection, DijitRegistry, 
+			Builder, Grid, DateTimeTextBox, RadioGroup,
+			loadCss, Uploader) {
 		
 		var util = {
 			confirm: function(title, message, callback) {
@@ -139,12 +148,20 @@ define([
 			}
 		};
 		
+		function formatTimestamp(value) {  
+			var inputDate = new Date(value);  
+			return dojo.date.locale.format(inputDate, {
+				selector:"date",
+				datePattern:"MMMM dd yyyy HH:mm:ss"
+			});  
+		}
+		
 		var selection = [];
 		
 		return declare("dexist.CollectionBrowser", [StackContainer], {
 			store: null,
 			grid: null,
-			target:"db/",
+			target:"",
 			collection: "/db",
 			uploadUrl:"/dashboard/plugins/browsing/upload.xql",
 			clipboard: null,
@@ -189,7 +206,7 @@ define([
 				// json data store
 				this.store = new Rest({
 					useRangeHeaders:true,
-					target:this.target,
+					target:this.target+"db/",
 					rpc:function(id,method,params,callId){
 						var callId = callId || "call-id";
 						return request.post(this.target+id,{
@@ -230,7 +247,8 @@ define([
 						field: "group"
 					},{
 						label: "Last-modified",
-						field: "lastModified"
+						field: "lastModified",
+						formatter:formatTimestamp
 					}]
 				});
 				this.browsingPage.addChild(this.grid);
@@ -248,11 +266,7 @@ define([
 						this.updateBreadcrumb();
 						this.grid.set("collection",this.store.filter({collection:this.collection}));
 					} else {
-						if(ev.altKey) {
-							this.openResource(item.id);
-						} else {
-							this.onSelectResource(item.id,item);
-						}
+						this.onSelectResource(item.id,item,ev);
 					}
 				}));
 				this.grid.on("dgrid-select", function(ev){
@@ -260,24 +274,6 @@ define([
 						return _.data;
 					});
 				});
-				/*on(this.grid, "keyUp", function(e) {
-					if (self.grid.edit.isEditing()) {
-						return;
-					}
-					if (!e.shiftKey && !e.altKey && !e.ctrlKey) {
-						e.stopImmediatePropagation();
-						e.preventDefault();
-						var idx = self.grid.focus.rowIndex;
-						switch (e.which) {
-							case 13: // enter
-								self.changeCollection(idx);
-								break;
-							case 8: // backspace
-								self.changeCollection(0);
-								break;
-						}
-					}
-				});*/
 
 				var tools = [{
 					id:"reload",
@@ -317,10 +313,8 @@ define([
 					});
 					this.tools[_.id] = bt;
 					this.toolbar.addChild(bt);
-				},this)
-				
+				},this);
 
-				/* on(this.tools["properties"], "click", lang.hitch(this, "properties")); */
 				this.tools["properties"].on("click", lang.hitch(this,function(ev) {
 					if(selection.length && selection.length > 0) {
 						this.store.get(selection[0].id).then(lang.hitch(this,function(item){
@@ -341,28 +335,35 @@ define([
 									readOnly:true
 								},{
 									name:"created",
-									type:"text",
+									type:"datetime",
 									readOnly:true
 								},{
 									name:"lastModified",
 									title:"Last Modified",
-									type:"text",
+									type:"datetime",
 									readOnly:true
 								},{
 									name:"owner",
-									type:"text",
-									trim:true
+									type:"select",
+									pageSize:"25",
+									store:new DstoreAdapter(new Rest({
+										useRangeHeaders:true,
+										target:this.target+"user/"
+									}))
 								},{
 									name:"group",
-									type:"text",
-									trim:true
+									type:"select",
+									pageSize:"25",
+									store:new DstoreAdapter(new Rest({
+										useRangeHeaders:true,
+										target:this.target+"group/"
+									}))
 								},{
 									name:"permissions",
 									type:"grid",
 									add:false,
 									edit:false,
 									remove:false,
-									style:"height:200px",
 									selectionMode:"none",
 									columns: [{
 										label: "Permission",
@@ -381,13 +382,15 @@ define([
 										editor: "checkbox"
 									},{
 										label: "Special",
+										field: "specialLabel"
+									},{
+										label: "",
 										field: "special",
 										editor: "checkbox"
 									}]
 								},{
 									name:"acl",
 									type:"grid",
-									style:"height:200px",
 									controller:{
 										type:"select",
 										name:"target"
@@ -426,7 +429,11 @@ define([
 											properties:{
 												who:{
 													title:"Subject",
-													type:"string",
+													type:"array",
+													format:"select",
+													items: {
+														$ref:this.target+"user/"
+													},
 													required:true
 												},
 												access_type:{
@@ -451,7 +458,11 @@ define([
 											properties:{
 												who:{
 													title:"Subject",
-													type:"string",
+													type:"array",
+													format:"select",
+													items: {
+														$ref:this.target+"group/"
+													},
 													required:true
 												},
 												access_type:{
@@ -501,12 +512,7 @@ define([
 				on(this.tools["paste"], "click", lang.hitch(this,"pasteResources"));
 				on(this.tools["reload"], "click", lang.hitch(this, function(){ this.refresh()}));
 				on(this.tools["reindex"], "click", lang.hitch(this, "reindex"));
-				/*on(this.tools["edit"], "click", lang.hitch(this, function(ev) {
-					var items = this.grid.selection.getSelected();
-					if(items.length && items.length > 0 && !items[0].isCollection) {
-						this.openResource(items[0].id);
-					}
-				}));*/
+
 				this.addChild(this.browsingPage);
 				this.addChild(this.propertiesPage);
 				this.grid.startup();
@@ -559,26 +565,6 @@ define([
 				}
 				return null;
 			},
-
-			/*applyProperties: function(dlg, resources) {
-				var self = this;
-				var form = dom.byId("browsing-dialog-form");
-				var params = domForm.toObject(form);
-				params.resources = resources;
-				request.post("/dashboard/plugins/browsing/properties/",{
-					data: params,
-					handleAs: "json"
-				}).then(function(data) {
-					self.refresh();
-					if (data.status == "ok") {
-						registry.byId("browsing-dialog").hide();
-					} else {
-						util.message("Changing Properties Failed!", "Could not change properties on all resources!");
-					}
-				},function() {
-					util.message("Server Error", "An error occurred while communicating to the server!");
-				});
-			},*/
 
 			refresh: function(collection) {
 				if(collection) {
@@ -677,8 +663,8 @@ define([
 				});
 			},
 			
-			onSelectResource:function(path){
-				//override!
+			onSelectResource:function(id,item,evt){
+				this.openResource("/db/"+id);
 			},
 			
 			openResource: function(path) {
