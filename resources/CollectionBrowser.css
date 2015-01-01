@@ -1,3 +1,5 @@
+@import url("../../dforma/resources/Builder.css");
+
 .dexistCollectionBrowser .dijitContentPane {
 	overflow: hidden;
 	padding:0;
@@ -20,7 +22,7 @@
 }
 
 .dexistCollectionBrowser .dformaGrid-permissions .field-id {
-	width:30%
+	width:40%
 }
 
 .dexistCollectionBrowser .dformaGrid-permissions .field-read {
@@ -35,8 +37,14 @@
 	width:10%
 }
 
+.dexistCollectionBrowser .dformaGrid-permissions .field-specialLabel {
+	width:10%;
+	border-right:none;
+}
+
 .dexistCollectionBrowser .dformaGrid-permissions .field-special {
-	width:40%
+	width:20%;
+	border-left:none;
 }
 
 .dexistCollectionBrowser .dformaGrid-acl .field-target {
@@ -65,7 +73,11 @@
 
 
 .dexistCollectionBrowser .dformaGridContainer .dgrid {
-	height:160px;
+	width:auto;
+}
+
+.dexistCollectionBrowser .dformaGrid-permissions {
+	height:100px;
 }
 
 
