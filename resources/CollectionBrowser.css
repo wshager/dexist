@@ -76,10 +76,30 @@
 	width:auto;
 }
 
-.dexistCollectionBrowser .dformaGrid-permissions {
-	height:100px;
+.dformaBuilder .dformaBuilder {
+	border:1px solid #ddd;
+	padding-bottom:30px;
 }
 
+.dformaLabelNode {
+	min-width:9em;
+}
+
+.dexistCollectionBrowser .dformaGrid-permissions {
+	height:104px;
+	margin-bottom:40px;
+}
+
+.dexistCollectionBrowser .dformaGrid-permissions .dgrid-scroller {
+	position: relative;
+	overflow-y: hidden;
+}
+.dexistCollectionBrowser .dformaGrid-permissions .dgrid-header-scroll {
+	display: none;
+}
+.dexistCollectionBrowser .dformaGrid-permissions .dgrid-header {
+	right: 0;
+}
 
 .dexistBreadCrumb {
   height: 16px;
