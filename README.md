@@ -1,7 +1,7 @@
 dexist
 ======
 
-Tools for eXist based on Dojo
+Tools for eXist based on Dojo 1.10.x
 
 ----
 
