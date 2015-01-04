@@ -344,7 +344,7 @@ define([
 						store: new DstoreAdapter(new Memory({
 							data:[{
 								id:1,
-								name:"1x",
+								name:"1x"
 							},{
 								id:2,
 								name:"2x"
@@ -356,7 +356,7 @@ define([
 								name:"16x"
 							}]
 						})),
-						style:"width:40px;margin-right:.5em",
+						style:"width:40px;",
 						required:false,
 						value:this.thumbnailSize,
 						onChange:lang.hitch(this,function(val){
@@ -376,13 +376,13 @@ define([
 						store: new DstoreAdapter(new Memory({
 							data:[{
 								id:"details",
-								name:"Details",
+								name:"Details"
 							},{
 								id:"tiles",
 								name:"Tiles"
 							}]
 						})),
-						style:"width:70px;margin-right:.5em",
+						style:"width:60px;",
 						required:false,
 						value:this.display,
 						onChange:lang.hitch(this,function(val){
@@ -428,7 +428,7 @@ define([
 							}]
 						})),
 						searchAttr:"id",
-						style:"width:150px;margin-right:.5em",
+						style:"width:140px;",
 						required:false,
 						value:this.sort,
 						onChange:lang.hitch(this,function(val){
