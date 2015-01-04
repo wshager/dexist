@@ -16,7 +16,7 @@ define([
 function(declare, array, dom, domConstruct, domStyle, query, fx,_WidgetBase,_TemplatedMixin,template, $, fileupload,loadCss) {
     
     return declare("dexist.Uploader",[_WidgetBase,_TemplatedMixin], {
-        url:"/dashboard/plugins/browsing/upload.xql",
+        url:"upload",
         collection:"/db",
     	templateString:template,
         baseClass:"dexistUploader",

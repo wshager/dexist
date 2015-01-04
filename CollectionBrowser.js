@@ -166,7 +166,6 @@ define([
 			grid: null,
 			target:"",
 			collection: "/db",
-			uploadUrl:"/dashboard/plugins/browsing/upload.xql",
 			clipboard: null,
 			clipboardCut: false,
 			editor: null,
@@ -522,7 +521,7 @@ define([
 				});
 				this.uploader = new Uploader({
 					collection:this.collection,
-					url:this.uploadUrl,
+					url:this.target+"upload",
 					onDone:function(){
 						self.refresh();
 					}
