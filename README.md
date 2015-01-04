@@ -36,4 +36,4 @@ display | The default view of the collection items (details or tiles)
 
 Method | Description
 refresh(collection) | Call this to change or refresh the current collection
-onSelectResource(id,item,event) | Override this method to connect to the selecting (double-clicking) of a resource. Note that the the complete path is `"/db/"+id`.
+onSelectResource(id,item,event) | Override this method to connect to the selecting (double-clicking) of a resource. Note that the complete path is `"/db/"+id`.
