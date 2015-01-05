@@ -225,7 +225,7 @@
 	max-height:128px;
 }
 .dexistCollectionBrowser .breadcrumb {
-	min-height:20px;
+	height:24px;
 }
 .dexistCollectionBrowser .breadcrumb a {
 	font-size:110%;
