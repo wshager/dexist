@@ -34,6 +34,7 @@ define([
 	"dgrid/Editor",
 	"dgrid/Keyboard",
 	"dgrid/Selection",
+	"dgrid/util/touch",
 	"dgrid/extensions/DijitRegistry",
 	
 	"dforma/Builder",
@@ -48,7 +49,7 @@ define([
 	function(declare, lang, array, has, dom, domConstruct, domClass, domGeometry, domForm, on, query, request, locale, cookie, 
 			Memory, Cache, Rest, DstoreAdapter,
 			ContentPane, LayoutContainer, StackContainer, Toolbar, ToolbarSeparator, Dialog, Button, CheckBox, FilteringSelect,  
-			OnDemandGrid, OnDemandList, Editor, Keyboard, Selection, DijitRegistry, 
+			OnDemandGrid, OnDemandList, Editor, Keyboard, Selection, touchUtil, DijitRegistry, 
 			Builder, Grid, DateTimeTextBox, RadioGroup,
 			loadCss, Uploader) {
 		
@@ -171,9 +172,9 @@ define([
 			clipboardCut: false,
 			editor: null,
 			tools:null,
-			thumbnailSize:2,
+			thumbnailSize:has("touch") ? 4 : 2,
 			sort:"+internetMediaType",
-			display:"details",
+			display:has("touch") ? "tiles" : "details",
 			persist:true,
 			baseClass:"dexistCollectionBrowser",
 			updateBreadcrumb:function() {
@@ -210,20 +211,17 @@ define([
 			},
 			_connectGrid:function(){
 				this.browsingPage.addChild(this.grid);
-				this.grid.on('dgrid-refresh-complete',lang.hitch(this,function() {
-					this.resize();
-					var p = dijit.getEnclosingWidget(this.domNode.parentNode);
-					if(p) p.resize();
-				}));						
-				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,function(ev) {
-					var row = this.grid.row(ev);
-					var item = row.data;
-					if(item.isCollection) {
-						this.refresh("/db/"+item.id);
-					} else {
-						this.onSelectResource(item.id,item,ev);
-					}
-				}));
+				this.grid.on('dgrid-refresh-complete',lang.hitch(this,function(){
+					setTimeout(lang.hitch(this,function() {
+						this.resize();
+						var p = dijit.getEnclosingWidget(this.domNode.parentNode);
+						if(p) {
+							p.resize();
+						}
+					}),250);
+				}));	
+				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,"_gridDblClick"));
+				this.grid.on(touchUtil.selector(".dgrid-row", touchUtil.dbltap), lang.hitch(this,"_gridDblClick"));
 				this.grid.on("dgrid-select", lang.hitch(this,function(ev){
 					selection = array.map(ev.rows,function(_){
 						return _.data;
@@ -238,6 +236,15 @@ define([
 				}));
 				domClass.add(this.grid.domNode,"thumbnailx"+this.thumbnailSize);
 				this.grid.startup();
+			},
+			_gridDblClick:function(ev) {
+				var row = this.grid.row(ev);
+				var item = row.data;
+				if(item.isCollection) {
+					this.refresh("/db/"+item.id);
+				} else {
+					this.onSelectResource(item.id,item,ev);
+				}
 			},
 			_destroyGrid:function(){
 				this.browsingPage.removeChild(this.grid);
@@ -273,7 +280,7 @@ define([
 							return domConstruct.create('img',{
 								src:require.toUrl("dexist/resources/images/info.svg")
 							});
-					    },
+						},
 						formatter:lang.hitch(this,"formatMediaType")
 					},{
 						label: "Name",
