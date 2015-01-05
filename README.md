@@ -44,7 +44,7 @@ onSelectResource(id,item,event) | Override this method to connect to the selecti
 Uploader
 =================
 
-File Uploader widget using (jQuery-File-Upload)[https://github.com/blueimp/jQuery-File-Upload].
+File Uploader widget using [jQuery-File-Upload](https://github.com/blueimp/jQuery-File-Upload).
 
 ### Properties:
 
