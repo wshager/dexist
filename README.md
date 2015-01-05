@@ -37,6 +37,7 @@ display | The default view of the collection items (details or tiles)
 ### Methods:
 
 Method | Description
+------ | -----------
 refresh(collection) | Call this to change or refresh the current collection
 onSelectResource(id,item,event) | Override this method to connect to the selecting (double-clicking) of a resource. Note that the complete path is `"/db/"+id`.
 
@@ -56,4 +57,5 @@ collection | The collection for the POST request
 ### Methods:
 
 Method | Description
+------ | -----------
 onDone(errors) | Fired when uploading has finished
