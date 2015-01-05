@@ -20,6 +20,8 @@ Deps:
 CollectionBrowser
 =================
 
+Collection Browser widget for eXist.
+
 ### Properties:
 
 Property | Description
@@ -37,3 +39,21 @@ display | The default view of the collection items (details or tiles)
 Method | Description
 refresh(collection) | Call this to change or refresh the current collection
 onSelectResource(id,item,event) | Override this method to connect to the selecting (double-clicking) of a resource. Note that the complete path is `"/db/"+id`.
+
+
+Uploader
+=================
+
+File Uploader widget using (jQuery-File-Upload)[https://github.com/blueimp/jQuery-File-Upload].
+
+### Properties:
+
+Property | Description
+-------- | -----------
+url | The target URL to POST the upload to
+collection | The collection for the POST request
+
+### Methods:
+
+Method | Description
+onDone(errors) | Fired when uploading has finished
