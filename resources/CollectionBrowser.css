@@ -265,6 +265,9 @@
 .dexistCollectionBrowser .dijitToolbar .dijitButtonDisabled .dijitButtonNode {
 	opacity:.5;
 }
+.dexistCollectionBrowser .dformaBuilder {
+	overflow:auto;
+}
 .dexistCollectionBrowser .dijitToolbar .dformaLabel {
 	margin:0;
 }
