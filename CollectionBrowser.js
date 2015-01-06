@@ -215,7 +215,7 @@ define([
 					setTimeout(lang.hitch(this,function() {
 						if(this.persist){
 							// selection may be set from cookie
-							var resources = cookie("dexistSelection").split(",");
+							var resources = (""+cookie("dexistSelection")).split(",");
 							if(resources.length) {
 								this.setSelected(resources);
 								// properties page may be selected
