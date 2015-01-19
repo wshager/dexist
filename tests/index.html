@@ -3,10 +3,17 @@
     <head>
         <meta charset="utf-8" />
         <link rel="stylesheet" href="../../dijit/themes/claro/claro.css"/>
+        <link rel="stylesheet" href="../../dgrid/css/skins/claro.css"/>
         <script src="../../dojo/dojo.js" data-dojo-config="async:true,locale:'en-us'"></script>
+        <style>
+        	.dexistCollectionBrowser {
+        		height:100%;
+        		min-height:500px;
+        	}
+        </style>
         <script type="text/javascript">
 			require(["dexist/CollectionBrowser"],function(CollectionBrowser){
-				var cb = new CollectionBrowser({target:"/collectionbrowser/db/"});
+				var cb = new CollectionBrowser({target:"/collectionbrowser/"});
 				cb.placeAt(document.body);
 				cb.startup();
 			});

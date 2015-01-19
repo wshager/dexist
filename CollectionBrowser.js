@@ -5,37 +5,53 @@ define([
 	"dojo/has",
 	"dojo/dom",
 	"dojo/dom-construct",
-	"dojo/dom-style",
+	"dojo/dom-class",
 	"dojo/dom-geometry",
 	"dojo/dom-form",
 	"dojo/on",
 	"dojo/query",
 	"dojo/request",
-	"dojo/data/ObjectStore",
+	"dojo/date/locale",
+	"dojo/cookie",
+	
 	"dstore/Memory",
 	"dstore/Cache",
 	"dstore/Rest",
-	"dijit/registry",
+	"dstore/legacy/DstoreAdapter",
+	
 	"dijit/layout/ContentPane",
 	"dijit/layout/LayoutContainer",
 	"dijit/layout/StackContainer",
 	"dijit/Toolbar",
+	"dijit/ToolbarSeparator",
 	"dijit/Dialog",
 	"dijit/form/Button",
 	"dijit/form/CheckBox",
-	"dijit/form/Select",
+	"dijit/form/FilteringSelect",
+	
 	"dgrid/OnDemandGrid",
+	"dgrid/OnDemandList",
 	"dgrid/Editor",
 	"dgrid/Keyboard",
 	"dgrid/Selection",
+	"dgrid/util/touch",
 	"dgrid/extensions/DijitRegistry",
+	
 	"dforma/Builder",
+	"dforma/Grid",
+	"dforma/DateTimeTextBox",
+	"dforma/RadioGroup",
+	
+	"./util/load-css",
+	"./Uploader",
 	"dojo/_base/sniff"
 ],
-	function(declare, lang, array, has, dom, domConstruct, domStyle, domGeometry, domForm, 
-			on, query, request, ObjectStore, Memory, Cache, Rest, 
-			registry, ContentPane, LayoutContainer, StackContainer, Toolbar, Dialog, Button, CheckBox, Select,  
-			OnDemandGrid, Editor, Keyboard, Selection, DijitRegistry, Builder) {
+	function(declare, lang, array, has, dom, domConstruct, domClass, domGeometry, domForm, on, query, request, locale, cookie, 
+			Memory, Cache, Rest, DstoreAdapter,
+			ContentPane, LayoutContainer, StackContainer, Toolbar, ToolbarSeparator, Dialog, Button, CheckBox, FilteringSelect,  
+			OnDemandGrid, OnDemandList, Editor, Keyboard, Selection, touchUtil, DijitRegistry, 
+			Builder, Grid, DateTimeTextBox, RadioGroup,
+			loadCss, Uploader) {
 		
 		var util = {
 			confirm: function(title, message, callback) {
@@ -137,17 +153,29 @@ define([
 			}
 		};
 		
-		var selection;
+		function formatTimestamp(value) {  
+			var inputDate = new Date(value);  
+			return dojo.date.locale.format(inputDate, {
+				selector:"date",
+				datePattern:"MMMM dd yyyy HH:mm:ss"
+			});  
+		}
+		
+		var selection = [];
 		
 		return declare("dexist.CollectionBrowser", [StackContainer], {
 			store: null,
 			grid: null,
-			target:"db/",
+			target:"",
 			collection: "/db",
 			clipboard: null,
 			clipboardCut: false,
 			editor: null,
 			tools:null,
+			thumbnailSize:has("touch") ? 4 : 2,
+			sort:"+internetMediaType",
+			display:has("touch") ? "tiles" : "details",
+			persist:true,
 			baseClass:"dexistCollectionBrowser",
 			updateBreadcrumb:function() {
 				var self = this;
@@ -163,59 +191,117 @@ define([
 					},this.breadcrumb);
 				},this);
 			},
-			startup: function() {
-				if(this._started) return;
-				var self = this;
-				
-				this.loadCSS(require.toUrl("dexist/resources/CollectionBrowser.css"));
-				
-				this.browsingPage = new LayoutContainer({
-				});
-				this.propertiesPage = new ContentPane({
-				});
-				this.browsingTop = new ContentPane({
-					region:"top"
-				});
-				this.browsingPage.addChild(this.browsingTop);
-				this.toolbar = new Toolbar();
-				this.browsingTop.addChild(this.toolbar);
-				this.breadcrumb = domConstruct.create("div",{
-					"class":"dexistBreadCrumb"
-				},this.browsingTop.domNode,"last");
-				this.updateBreadcrumb();
-				// json data store
-				this.store = new Rest({
-					useRangeHeaders:true,
-					target:this.target,
-					rpc:function(id,method,params,callId){
-						var callId = callId || "call-id";
-						return request.post(this.target+id,{
-							data:JSON.stringify({
-								method:method,
-								params:params,
-								id:callId
-							}),
-							handleAs:"json",
-							headers:{
-								"Content-Type":"application/json",
-								"Accept":"application/json"
+			formatMediaType:function(value,item) {
+				var ext = item.isCollection ? null : item.name.match(/\.[0-9a-z]{3,4}$/i);
+				ext = ext && ext.length ? ext[0].substr(1) : null;
+				var base = require.toUrl("dexist/resources/images/file-128");
+				var sup,sub;
+				if(!item.isCollection){
+					var part = value.split("/");
+					sup = part.shift();
+					sub = part.shift();
+				}
+				var files = ["xml","xhtml+xml","xquery","json","css","xslt+xml","xml-dtd","html","x-javascript","octet-stream"];
+				var thumb = item.thumbnail ? this.target+"thumb"+item.thumbnail :
+					base+"/"+(item.isCollection ? "collection" : 
+						array.indexOf(files,ext)>-1 ? ext : 
+							array.indexOf(files,sub)>-1 ? sub : 
+								sup =="image" ? "img" : "generic")+".png";
+				return "<img title=\""+value+"\" class=\"thumbnail\" src=\""+thumb+"\"/>";
+			},
+			_connectGrid:function(){
+				this.browsingPage.addChild(this.grid);
+				this.grid.on('dgrid-refresh-complete',lang.hitch(this,function(){
+					setTimeout(lang.hitch(this,function() {
+						if(this.persist){
+							// selection may be set from cookie
+							var resources = (""+cookie("dexistSelection")).split(",");
+							if(resources.length) {
+								this.setSelected(resources);
+								// properties page may be selected
+								if(this.propertiesPage.selected){
+									this._buildPropertiesForm();
+								}
 							}
-						});
-					}
+						}
+						this.resize();
+						var p = dijit.getEnclosingWidget(this.domNode.parentNode);
+						if(p) {
+							p.resize();
+						}
+					}),250);
+				}));	
+				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,"_gridDblClick"));
+				this.grid.on(touchUtil.selector(".dgrid-row", touchUtil.dbltap), lang.hitch(this,"_gridDblClick"));
+				this.grid.on("dgrid-select", lang.hitch(this,"_gridSelect"));
+				this.grid.on("dgrid-deselect", lang.hitch(this,"_gridSelect"));
+				domClass.add(this.grid.domNode,"thumbnailx"+this.thumbnailSize);
+				this.grid.startup();
+			},
+			_gridSelect:function(ev){
+				selection = array.map(ev.rows,function(_){
+					return _.data;
 				});
-
+				if(this.persist){
+					var resources = this.getSelected();
+					if(resources && resources.length>0){
+						cookie("dexistSelection",resources.join(","));
+					} else {
+						cookie("dexistSelection","");
+					}
+				}
+				this.updateToolbar(selection.length);
+			},
+			_gridDblClick:function(ev) {
+				var row = this.grid.row(ev);
+				var item = row.data;
+				if(item.isCollection) {
+					this.refresh("/db/"+item.id);
+				} else {
+					this.onSelectResource(item.id,item,ev);
+				}
+			},
+			_destroyGrid:function(){
+				this.browsingPage.removeChild(this.grid);
+				this.grid.destroy();
+			},
+			_renderList:function(){
+				var sort = [{property:this.sort.substr(1),descending:this.sort.charAt(0)=="-"}];
+				this.grid = new (declare([OnDemandList, Keyboard, Selection, DijitRegistry]))({
+					region:"center",
+					"class":"browsingList",
+					sort:sort,
+					collection: this.store.filter({collection:this.collection}),
+					farOffRemoval: 500,
+					renderRow: lang.hitch(this,function(object){
+						var thumb = this.formatMediaType(object.internetMediaType,object);
+						return domConstruct.create("div",{
+							innerHTML:"<div class=\"tile-row\"><span class=\"tile-thumb\">"+thumb+"</span></div><div class=\"tile-row\"><span class=\"tile-text\">"+object.name+"</span></div>"
+						});
+					})
+				});
+			},
+			_renderGrid:function(){
+				var sort = [{property:this.sort.substr(1),descending:this.sort.charAt(0)=="-"}];
 				this.grid = new (declare([OnDemandGrid, Keyboard, Selection, Editor, DijitRegistry]))({
 					region:"center",
-					id:"browsingGrid",
+					"class":"browsingGrid",
+					sort:sort,
 					collection: this.store.filter({collection:this.collection}),
 					columns: [{
+						label: "ℹ",
+						field: "internetMediaType",
+						renderHeaderCell: function(node) {
+							return domConstruct.create('img',{
+								src:require.toUrl("dexist/resources/images/info.svg")
+							});
+						},
+						formatter:lang.hitch(this,"formatMediaType")
+					},{
 						label: "Name",
 						field: "name",
 						editor: "text",
-						editOn: "click",
-						canEdit: function(item, value){
-							return value != "..";
-						}
+						editOn: "click"
 					},{
 						label: "Permissions",
 						field: "permissionsString"
@@ -227,55 +313,14 @@ define([
 						field: "group"
 					},{
 						label: "Last-modified",
-						field: "lastModified"
+						field: "lastModified",
+						formatter:formatTimestamp
 					}]
 				});
-				this.browsingPage.addChild(this.grid);
-				this.grid.on('dgrid-refresh-complete',lang.hitch(this,function() {
-					this.resize();
-					var p = dijit.getEnclosingWidget(this.domNode.parentNode);
-					if(p) p.resize();
-				}));						
-				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,function(ev) {
-					var row = this.grid.row(ev);
-					var item = row.data;
-					if(item.isCollection) {
-						this.collection = "/db/"+item.id;
-						// console.debug("collection: ", this.collection);
-						this.updateBreadcrumb();
-						this.grid.set("collection",this.store.filter({collection:this.collection}));
-					} else {
-						if(ev.altKey) {
-							this.openResource(item.id);
-						} else {
-							this.onSelectResource(item.id,item);
-						}
-					}
-				}));
-				this.grid.on("dgrid-select", function(ev){
-					selection = array.map(ev.rows,function(_){
-						return _.data;
-					});
-				});
-				/*on(this.grid, "keyUp", function(e) {
-					if (self.grid.edit.isEditing()) {
-						return;
-					}
-					if (!e.shiftKey && !e.altKey && !e.ctrlKey) {
-						e.stopImmediatePropagation();
-						e.preventDefault();
-						var idx = self.grid.focus.rowIndex;
-						switch (e.which) {
-							case 13: // enter
-								self.changeCollection(idx);
-								break;
-							case 8: // backspace
-								self.changeCollection(0);
-								break;
-						}
-					}
-				});*/
-
+			},
+			_renderToolBar:function(){
+				this.toolbar = new Toolbar();
+				this.browsingTop.addChild(this.toolbar);
 				var tools = [{
 					id:"reload",
 					title:"Refresh"
@@ -304,150 +349,207 @@ define([
 					id:"add",
 					title:"Upload resources"
 				}];
-				
 				this.tools = {};
 				array.forEach(tools,function(_){
 					var bt = new Button({
 						title:_.title,
-						iconClass:"dexistToolbar-"+_.id,
+						iconClass:"toolbar-"+_.id,
 						showLabel:false
 					});
 					this.tools[_.id] = bt;
 					this.toolbar.addChild(bt);
-				},this)
-				
-
-				/* on(this.tools["properties"], "click", lang.hitch(this, "properties")); */
-				this.tools["properties"].on("click", lang.hitch(this,function(ev) {
-					if(selection.length && selection.length > 0) {
-						this.store.get(selection[0].id).then(lang.hitch(this,function(item){
-							this.selectChild(this.propertiesPage);
-							this.form.rebuild({
-								controls:[{
-									name:"name",
-									title:"Resource",
-									type:"text",
-									readOnly:true
-								},{
-									name:"internetMediaType",
-									title:"Internet Media Type",
-									type:"text",
-									readOnly:true
-								},{
-									name:"created",
-									type:"text",
-									readOnly:true
-								},{
-									name:"lastModified",
-									title:"Last Modified",
-									type:"text",
-									readOnly:true
-								},{
-									name:"owner",
-									type:"text",
-									trim:true
-								},{
-									name:"group",
-									type:"text",
-									trim:true
-								},{
-									name:"permissions",
-									type:"grid",
-									add:false,
-									edit:false,
-									remove:false,
-									style:"height:200px",
-									selectionMode:"none",
-									columns: [{
-										label: "Permission",
-										field: "id"
-									},{
-										label: "Read",
-										field: "read",
-										editor: "checkbox"
-									},{
-										label: "Write",
-										field: "write",
-										editor: "checkbox"
-									},{
-										label: "Execute",
-										field: "execute",
-										editor: "checkbox"
-									},{
-										label: "Special",
-										field: "special",
-										editor: "checkbox"
-									}]
-								},{
-									name:"acl",
-									type:"grid",
-									style:"height:200px",
-									columns:[{
-										label: "Target",
-										field: "target",
-										width: "20%"
-									},{
-										label: "Subject", 
-										field: "who", 
-										width: "30%"
-									},{
-										label: "Access", 
-										field: "access", 
-										width: "20%"
-									},{
-										label: "Read", 
-										field: "read", 
-										width: "10%", 
-										editor: "checkbox"
-									},{
-										label: "Write", 
-										field: "write", 
-										width: "10%", 
-										editor: "checkbox"
-									},{
-										label: "Execute", 
-										field: "execute", 
-										width: "10%", 
-										editor: "checkbox"
-									}]
-								}]
-							}).then(lang.hitch(this,function(widgets){
-								this.form.set("value",item);
-							}));
-						}));
-					}
+				},this);
+				this.toolbar.addChild(new ToolbarSeparator());
+				this.toolbar.addChild(new dforma.Label({
+					label:"Thumbnail Size",
+					child:new FilteringSelect({
+						store: new DstoreAdapter(new Memory({
+							data:[{
+								id:1,
+								name:"1x"
+							},{
+								id:2,
+								name:"2x"
+							},{
+								id:4,
+								name:"4x"
+							},{
+								id:16,
+								name:"16x"
+							}]
+						})),
+						style:"width:40px;",
+						required:false,
+						value:this.thumbnailSize,
+						onChange:lang.hitch(this,function(val){
+							domClass.remove(this.grid.domNode,"thumbnailx"+this.thumbnailSize);
+							domClass.add(this.grid.domNode,"thumbnailx"+val);
+							if(this.persist) {
+								cookie("dexistThumbnailSize",val);
+							}
+							this.thumbnailSize = val;
+						})
+					})
 				}));
-				
-				on(this.tools["delete"], "click", lang.hitch(this, "deleteResources"));
-				on(this.tools["new"], "click", lang.hitch(this, "createCollection"));
-
-				on(this.tools["add"], "click", lang.hitch(this, "upload"));
-
-				on(this.tools["copy"], "click", function(ev) {
-					ev.preventDefault();
-					self.clipboard = self.getSelected();
-					console.log("Cut %d resources", self.clipboard.length);
-					self.clipboardCut = false;
-				});
-				on(this.tools["cut"], "click", function(ev) {
-					ev.preventDefault();
-					self.clipboard = self.getSelected();
-					console.log("Cut %d resources", self.clipboard.length);
-					self.clipboardCut = true;
-				});
-				on(this.tools["paste"], "click", lang.hitch(this,"pasteResources"));
-				on(this.tools["reload"], "click", lang.hitch(this, "refresh"));
-				on(this.tools["reindex"], "click", lang.hitch(this, "reindex"));
-				/*on(this.tools["edit"], "click", lang.hitch(this, function(ev) {
-					var items = this.grid.selection.getSelected();
-					if(items.length && items.length > 0 && !items[0].isCollection) {
-						this.openResource(items[0].id);
+				this.toolbar.addChild(new ToolbarSeparator());
+				this.toolbar.addChild(new dforma.Label({
+					label:"Display",
+					child:new FilteringSelect({
+						store: new DstoreAdapter(new Memory({
+							data:[{
+								id:"details",
+								name:"Details"
+							},{
+								id:"tiles",
+								name:"Tiles"
+							}]
+						})),
+						style:"width:60px;",
+						required:false,
+						value:this.display,
+						onChange:lang.hitch(this,function(val){
+							this._destroyGrid();
+							if(val=="details") {
+								this._renderGrid();
+							} else {
+								this._renderList();
+							}
+							this._connectGrid();
+							if(this.persist) {
+								cookie("dexistDisplay",val);
+							}
+							this.display = val;
+						})
+					})
+				}));
+				this.toolbar.addChild(new ToolbarSeparator());
+				this.toolbar.addChild(new dforma.Label({
+					label:"Order by",
+					child:new FilteringSelect({
+						store: new DstoreAdapter(new Memory({
+							data:[{
+								id:"+internetMediaType"
+							},{
+								id:"-internetMediaType"
+							},{
+								id:"+name"
+							},{
+								id:"-name"
+							},{
+								id:"+lastModified"
+							},{
+								id:"-lastModified"
+							},{
+								id:"+user"
+							},{
+								id:"-user"
+							},{
+								id:"+group"
+							},{
+								id:"-group"
+							}]
+						})),
+						searchAttr:"id",
+						style:"width:140px;",
+						required:false,
+						value:this.sort,
+						onChange:lang.hitch(this,function(val){
+							var sort = [{property:val.substr(1),descending:val.charAt(0)=="-"}];
+							this.grid.set("sort", sort);
+							if(this.persist) {
+								cookie("dexistSort",val);
+							}
+							this.sort = val;
+						})
+					})
+				}));
+				this.updateToolbar(0);
+				this.tools["paste"].set("disabled",true);
+				this.toolbar.own(
+					on(this.tools["properties"],"click", lang.hitch(this,"_buildPropertiesForm")),
+					on(this.tools["delete"], "click", lang.hitch(this, "_deleteResources")),
+					on(this.tools["new"], "click", lang.hitch(this, "_createCollection")),
+					on(this.tools["add"], "click", lang.hitch(this, "_upload")),
+					on(this.tools["copy"], "click", lang.hitch(this,"_copy")),
+					on(this.tools["cut"], "click", lang.hitch(this,"_cut")),
+					on(this.tools["paste"], "click", lang.hitch(this,"_pasteResources")),
+					on(this.tools["reload"], "click", lang.hitch(this, function(){this.refresh()})),
+					on(this.tools["reindex"], "click", lang.hitch(this, "_reindex"))
+				);
+			},
+			updateToolbar:function(len){
+				var disable = ["properties","delete","copy","cut"];
+				for(var k in this.tools) {
+					if(array.indexOf(disable,k)>-1){
+						this.tools[k].set("disabled",len===0);
 					}
-				}));*/
+				}
+			},
+			startup: function() {
+				if(this._started) return;
+				if(this.persist){
+					this.collection = cookie("dexistCollection") || this.collection;
+					this.thumbnailSize = cookie("dexistThumbnailSize") || this.thumbnailSize;
+					this.display = cookie("dexistDisplay") || this.display;
+					this.sort = cookie("dexistSort") || this.sort;
+				}
+				var self = this;
+				
+				loadCss(require.toUrl("dexist/resources/CollectionBrowser.css"));
+				
+				this.browsingPage = new LayoutContainer({
+				});
+				this.propertiesPage = new ContentPane({
+				});
+				this.browsingTop = new ContentPane({
+					region:"top"
+				});
+				this.browsingPage.addChild(this.browsingTop);
+				this._renderToolBar();
+				this.breadcrumb = domConstruct.create("div",{
+					"class":"breadcrumb"
+				},this.browsingTop.domNode,"last");
+				this.updateBreadcrumb();
+				// json data store
+				this.store = new Rest({
+					useRangeHeaders:true,
+					target:this.target+"db/",
+					rpc:function(id,method,params,callId){
+						callId = callId || "call-id";
+						return request.post(this.target+id,{
+							data:JSON.stringify({
+								method:method,
+								params:params,
+								id:callId
+							}),
+							handleAs:"json",
+							headers:{
+								"Content-Type":"application/json",
+								"Accept":"application/json"
+							}
+						});
+					}
+				});
+				if(this.display=="details") {
+					this._renderGrid();
+				} else {
+					this._renderList();
+				}
 				this.addChild(this.browsingPage);
 				this.addChild(this.propertiesPage);
-				this.grid.startup();
-				//new Uploader(dom.byId("browsing-upload"), lang.hitch(this, "refresh"));
+				this._connectGrid();
+				// init uploader
+				this.uploadDlg = new Dialog({
+					title:"Upload Files"
+				});
+				this.uploader = new Uploader({
+					collection:this.collection,
+					url:this.target+"upload",
+					onDone:function(){
+						self.refresh();
+					}
+				});
+				this.uploadDlg.containerNode.appendChild(this.uploader.domNode);
 				
 				this.form = new Builder({
 					cancellable:true,
@@ -457,8 +559,12 @@ define([
 					submit:function(){
 						if(!this.validate()) return;
 						var data = this.get("value");
-						console.log(data);
-						self.selectChild(self.browsingPage);
+						self.store.put(data).then(function(){
+							self.selectChild(self.browsingPage);
+							util.message("Properties updated successfully", "Properties updated");
+						},function(err){
+							util.message("Changing Properties Failed!", "Could not change properties on all resources! <br>Server says: "+err.response.xhr.responseText);
+						});
 					}
 				});
 				
@@ -468,9 +574,8 @@ define([
 				this.grid.focus();
 				this.inherited(arguments);
 			},
-
 			getSelected: function(collectionsOnly) {
-				if(selection.length && selection.length > 0) {
+				if(selection && selection.length > 0) {
 					var resources = [];
 					array.forEach(selection, function(item) {
 						if (!collectionsOnly || item.isCollection)
@@ -480,47 +585,213 @@ define([
 				}
 				return null;
 			},
-
-			/*applyProperties: function(dlg, resources) {
-				var self = this;
-				var form = dom.byId("browsing-dialog-form");
-				var params = domForm.toObject(form);
-				params.resources = resources;
-				request.post("/dashboard/plugins/browsing/properties/",{
-					data: params,
-					handleAs: "json"
-				}).then(function(data) {
-					self.refresh();
-					if (data.status == "ok") {
-						registry.byId("browsing-dialog").hide();
-					} else {
-						util.message("Changing Properties Failed!", "Could not change properties on all resources!");
-					}
-				},function() {
-					util.message("Server Error", "An error occurred while communicating to the server!");
-				});
-			},*/
-
+			setSelected: function(resources) {
+				if(resources && resources.length > 0) {
+					array.forEach(resources, function(id) {
+						this.grid.select(this.grid.row(id));
+					},this);
+				}
+			},
 			refresh: function(collection) {
 				if(collection) {
+					if(this.persist) {
+						cookie("dexistCollection",collection);
+					}
 					this.collection = collection;
 					this.updateBreadcrumb();
 				}
 				this.grid.set("collection",this.store.filter({collection:this.collection}));
 			},
-
-			changeCollection: function(idx) {
-				console.debug("Changing to item %d %o", idx, this.grid);
-				var item = this.grid.getItem(idx);
-				if (item.isCollection) {
-					this.collection = item.id;
-					this.grid.selection.deselectAll();
-					this.grid.set("collection",this.store.filter({collection:this.collection}));
-					this.grid.focus.setFocusIndex(0, 0);
-				}
+			_buildPropertiesForm:function(){
+				if(!selection.length) return;
+				this.store.get(selection[0].id).then(lang.hitch(this,function(item){
+					this.selectChild(this.propertiesPage);
+					this.form.rebuild({
+						controls:[{
+							name:"id",
+							type:"hidden"
+						},{
+							name:"name",
+							title:"Resource",
+							type:"text",
+							readOnly:true
+						},{
+							name:"internetMediaType",
+							title:"Internet Media Type",
+							type:"text",
+							readOnly:true
+						},{
+							name:"created",
+							type:"datetime",
+							readOnly:true
+						},{
+							name:"lastModified",
+							title:"Last Modified",
+							type:"datetime",
+							readOnly:true
+						},{
+							name:"owner",
+							type:"select",
+							pageSize:"25",
+							store:new DstoreAdapter(new Rest({
+								useRangeHeaders:true,
+								target:this.target+"user/"
+							}))
+						},{
+							name:"group",
+							type:"select",
+							pageSize:"25",
+							store:new DstoreAdapter(new Rest({
+								useRangeHeaders:true,
+								target:this.target+"group/"
+							}))
+						},{
+							name:"permissions",
+							type:"grid",
+							add:false,
+							edit:false,
+							remove:false,
+							selectionMode:"none",
+							columns: [{
+								label: "Permission",
+								field: "id"
+							},{
+								label: "Read",
+								field: "read",
+								editor: "checkbox"
+							},{
+								label: "Write",
+								field: "write",
+								editor: "checkbox"
+							},{
+								label: "Execute",
+								field: "execute",
+								editor: "checkbox"
+							},{
+								label: "Special",
+								field: "specialLabel"
+							},{
+								label: "",
+								field: "special",
+								editor: "checkbox"
+							}]
+						},{
+							name:"acl",
+							type:"grid",
+							controller:{
+								type:"select",
+								name:"target"
+							},
+							columns:[{
+								label: "Target",
+								field: "target",
+								width: "20%"
+							},{
+								label: "Subject", 
+								field: "who", 
+								width: "30%"
+							},{
+								label: "Access Type",
+								field: "access_type", 
+								width: "20%"
+							},{
+								label: "Read", 
+								field: "read", 
+								width: "10%", 
+								editor: "checkbox"
+							},{
+								label: "Write", 
+								field: "write", 
+								width: "10%", 
+								editor: "checkbox"
+							},{
+								label: "Execute", 
+								field: "execute", 
+								width: "10%", 
+								editor: "checkbox"
+							}],
+							schema:{
+								items:[{
+									id:"USER",
+									properties:{
+										who:{
+											title:"Subject",
+											type:"array",
+											format:"select",
+											items: {
+												$ref:this.target+"user/"
+											},
+											required:true
+										},
+										access_type:{
+											title:"Access Type",
+											type:"string",
+											format:"radiogroup",
+											"enum":["ALLOWED","DENIED"],
+											required:true
+										},
+										read:{
+											type:"boolean"
+										},
+										write:{
+											type:"boolean"
+										},
+										execute:{
+											type:"boolean"
+										}
+									}
+								},{
+									id:"GROUP",
+									properties:{
+										who:{
+											title:"Subject",
+											type:"array",
+											format:"select",
+											items: {
+												$ref:this.target+"group/"
+											},
+											required:true
+										},
+										access_type:{
+											title:"Access Type",
+											type:"string",
+											format:"radiogroup",
+											"enum":["ALLOWED","DENIED"],
+											required:true
+										},
+										read:{
+											type:"boolean"
+										},
+										write:{
+											type:"boolean"
+										},
+										execute:{
+											type:"boolean"
+										}
+									}
+								}]
+							}
+						}]
+					}).then(lang.hitch(this,function(widgets){
+						this.form.set("value",item);
+					}));
+				}));
 			},
-
-			createCollection: function() {
+			_copy:function(ev) {
+				ev.preventDefault();
+				this.clipboard = this.getSelected();
+				console.log("Cut %d resources", this.clipboard.length);
+				this.clipboardCut = false;
+				this.tools["paste"].set("disabled",false);
+			},
+			_cut:function(ev) {
+				ev.preventDefault();
+				this.clipboard = this.getSelected();
+				console.log("Cut %d resources", this.clipboard.length);
+				this.clipboardCut = true;
+				this.tools["paste"].set("disabled",false);
+			},
+			_createCollection: function() {
 				var self = this;
 				util.input("Create Collection", "Create a new collection",
 					"<label for='name'>Name:</label><input type='text' name='name'/>",
@@ -534,8 +805,7 @@ define([
 					}
 				);
 			},
-
-			deleteResources: function(ev) {
+			_deleteResources: function(ev) {
 				ev.preventDefault();
 				var self = this;
 				var resources = self.getSelected();
@@ -550,9 +820,9 @@ define([
 						});
 				}
 			},
-			
-			pasteResources:function(ev){
+			_pasteResources:function(ev){
 				ev.preventDefault();
+				this.tools["paste"].set("disabled",true);
 				if(this.clipboard && this.clipboard.length > 0) {
 					console.log("Paste: %d resources", this.clipboard.length);
 					var id = this.collection.replace(/^\/db\/?/,"");
@@ -568,14 +838,11 @@ define([
 					}));
 				}
 			},
-
-			upload: function() {
-				dom.byId("browsing-upload-collection").value = this.collection;
-				var uploadDlg = registry.byId("browsing-upload-dialog");
-				uploadDlg.show();
+			_upload: function() {
+				this.uploader.set("collection",this.collection);
+				this.uploadDlg.show();
 			},
-
-			reindex: function() {
+			_reindex: function() {
 				var self = this;
 				var id = this.collection.replace(/^\/db\/?/,"");
 				var resources = this.getSelected(true);
@@ -586,26 +853,24 @@ define([
 					}
 					id = resources[0];
 				}
-				
 				util.confirm("Reindex collection?", 
-					"Are you sure you want to reindex collection " + id + "?",
+					"Are you sure you want to reindex collection /db/" + id + "?",
 				function() {
 					self.store.rpc(id,"reindex").then(function() {
 						self.refresh();
 					},function() {
-						util.message("Reindex Failed!", "Reindex of collection " + id + " failed");
+						util.message("Reindex Failed!", "Reindex of collection /db/" + id + " failed");
 						self.refresh();
 					});
 				});
 			},
-			
-			onSelectResource:function(path){
-				//override!
+			onSelectResource:function(id,item,evt){
+				// override this to connect to double-click
+				this.openResource("/db/"+id);
 			},
-			
 			openResource: function(path) {
 				var exide = window.open("", "eXide");
-				if (exide && !exide.closed) {
+				if(exide && !exide.closed) {
 					
 					// check if eXide is really available or it's an empty page
 					var app = exide.eXide;
@@ -624,33 +889,17 @@ define([
 						window.eXide_onload = function() {
 							exide.eXide.app.findDocument(path);
 						};
-						// empty page
-						var href = window.location.href;
-						href = href.substring(0, href.indexOf("/dashboard")) + "/eXide/index.html";
-						exide.location = href;
+						// open eXide relative to this page
+						var href = location.href+"../eXide/index.html";
+						request(href).then(function(){
+							exide.location = href;
+						},function(){
+							util.message("Open Resource", "eXide is not available on the expected location.");
+						});
 					}
 				} else {
 					util.message("Open Resource", "Failed to start eXide in new window.");
 				}
-			},
-			
-			loadCSS: function(path) {
-				console.debug("loadCSS",path);
-
-				//todo: check this code - still needed?
-				var head = document.getElementsByTagName("head")[0];
-				query("link", head).forEach(function(elem) {
-					var href = elem.getAttribute("href");
-					if (href === path) {
-						// already loaded
-						return;
-					}
-				});
-				var link = document.createElement("link");
-				link.setAttribute("rel", "stylesheet");
-				link.setAttribute("type", "text/css");
-				link.setAttribute("href", path);
-				head.appendChild(link);
 			}
 		});
 	});
