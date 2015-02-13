@@ -44,7 +44,7 @@ define([
 	
 	"./util/load-css",
 	"./Uploader",
-	"dojo/_base/sniff"
+	"dojo/sniff"
 ],
 	function(declare, lang, array, has, dom, domConstruct, domClass, domGeometry, domForm, on, query, request, locale, cookie, 
 			Memory, Cache, Rest, DstoreAdapter,
@@ -52,6 +52,24 @@ define([
 			OnDemandGrid, OnDemandList, Editor, Keyboard, Selection, touchUtil, DijitRegistry, 
 			Builder, Grid, DateTimeTextBox, RadioGroup,
 			loadCss, Uploader) {
+	
+	
+		if(has("ie") < 9) {
+			lang.extend(Array, {
+				indexOf: function(x){
+					return array.indexOf(this,x);
+				},
+				forEach: function(fn) {
+					return array.forEach(this,fn);
+				},
+				map: function(fn) {
+					return array.map(this,fn);
+				},
+				filter: function(fn) {
+					return array.filter(this,fn);
+				}
+			});
+		}
 		
 		var util = {
 			confirm: function(title, message, callback) {
@@ -177,11 +195,13 @@ define([
 			display:has("touch") ? "tiles" : "details",
 			persist:true,
 			baseClass:"dexistCollectionBrowser",
+			rootId:"",
 			updateBreadcrumb:function() {
 				var self = this;
 				this.breadcrumb.innerHTML = "";
-				array.forEach(this.collection.split("/"),function(part,i,parts){
-					if(!part) return;
+				var rootCount = this.rootId.split("/").length;
+				this.collection.split("/").forEach(function(part,i,parts){
+					if(!part || i<rootCount) return;
 					domConstruct.create("a",{
 						innerHTML:part,
 						target: parts.slice(0,i+1).join("/"),
@@ -204,8 +224,8 @@ define([
 				var files = ["xml","xhtml+xml","xquery","json","css","xslt+xml","xml-dtd","html","x-javascript","octet-stream"];
 				var thumb = item.thumbnail ? this.target+"thumb"+item.thumbnail :
 					base+"/"+(item.isCollection ? "collection" : 
-						array.indexOf(files,ext)>-1 ? ext : 
-							array.indexOf(files,sub)>-1 ? sub : 
+						files.indexOf(ext)>-1 ? ext : 
+							files.indexOf(sub)>-1 ? sub : 
 								sup =="image" ? "img" : "generic")+".png";
 				return "<img title=\""+value+"\" class=\"thumbnail\" src=\""+thumb+"\"/>";
 			},
@@ -239,8 +259,10 @@ define([
 				this.grid.startup();
 			},
 			_gridSelect:function(ev){
-				selection = array.map(ev.rows,function(_){
+				selection = ev.rows.map(function(_){
 					return _.data;
+				}).filter(function(_){
+					return !!_;
 				});
 				if(this.persist){
 					var resources = this.getSelected();
@@ -350,7 +372,7 @@ define([
 					title:"Upload resources"
 				}];
 				this.tools = {};
-				array.forEach(tools,function(_){
+				tools.forEach(function(_){
 					var bt = new Button({
 						title:_.title,
 						iconClass:"toolbar-"+_.id,
@@ -480,7 +502,7 @@ define([
 			updateToolbar:function(len){
 				var disable = ["properties","delete","copy","cut"];
 				for(var k in this.tools) {
-					if(array.indexOf(disable,k)>-1){
+					if(disable.indexOf(k)>-1){
 						this.tools[k].set("disabled",len===0);
 					}
 				}
@@ -492,6 +514,11 @@ define([
 					this.thumbnailSize = cookie("dexistThumbnailSize") || this.thumbnailSize;
 					this.display = cookie("dexistDisplay") || this.display;
 					this.sort = cookie("dexistSort") || this.sort;
+				}
+				if(this.rootId) {
+					if(this.collection.substr(4,this.rootId.length)!=this.rootId){
+						this.collection = "/db/"+this.rootId;
+					}					
 				}
 				var self = this;
 				
@@ -555,12 +582,14 @@ define([
 					cancellable:true,
 					cancel:function(){
 						self.selectChild(self.browsingPage);
+						self.refresh();
 					},
 					submit:function(){
 						if(!this.validate()) return;
 						var data = this.get("value");
 						self.store.put(data).then(function(){
 							self.selectChild(self.browsingPage);
+							self.refresh();
 							util.message("Properties updated successfully", "Properties updated");
 						},function(err){
 							util.message("Changing Properties Failed!", "Could not change properties on all resources! <br>Server says: "+err.response.xhr.responseText);
@@ -577,7 +606,7 @@ define([
 			getSelected: function(collectionsOnly) {
 				if(selection && selection.length > 0) {
 					var resources = [];
-					array.forEach(selection, function(item) {
+					selection.forEach(function(item) {
 						if (!collectionsOnly || item.isCollection)
 							resources.push(item.id);
 					});
@@ -587,7 +616,7 @@ define([
 			},
 			setSelected: function(resources) {
 				if(resources && resources.length > 0) {
-					array.forEach(resources, function(id) {
+					resources.forEach(function(id) {
 						this.grid.select(this.grid.row(id));
 					},this);
 				}
