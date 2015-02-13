@@ -171,6 +171,8 @@
 .dformaLabelNode {
 	min-width:9em;
 	padding:0;
+	text-align: left;
+    width: auto;
 }
 
 .dformaLabelForCheckbox .dformaLabelNode {
@@ -265,6 +267,7 @@
 }
 .dexistCollectionBrowser .dijitToolbar .dformaLabel {
 	margin:0;
+	display: inline;
 }
 .dexistCollectionBrowser .dijitToolbar .dformaLabelNode {
 	min-width:2em;
