@@ -201,7 +201,7 @@ define([
 				this.breadcrumb.innerHTML = "";
 				var rootCount = this.rootId.split("/").length;
 				this.collection.split("/").forEach(function(part,i,parts){
-					if(!part || i<rootCount) return;
+					if(!part || i<=rootCount) return;
 					domConstruct.create("a",{
 						innerHTML:part,
 						target: parts.slice(0,i+1).join("/"),
