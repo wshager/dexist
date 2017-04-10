@@ -13,12 +13,12 @@ define([
 	"dojo/request",
 	"dojo/date/locale",
 	"dojo/cookie",
-	
+
 	"dstore/Memory",
 	"dstore/Cache",
 	"dstore/Rest",
 	"dstore/legacy/DstoreAdapter",
-	
+
 	"dijit/layout/ContentPane",
 	"dijit/layout/LayoutContainer",
 	"dijit/layout/StackContainer",
@@ -28,7 +28,7 @@ define([
 	"dijit/form/Button",
 	"dijit/form/CheckBox",
 	"dijit/form/FilteringSelect",
-	
+
 	"dgrid/OnDemandGrid",
 	"dgrid/OnDemandList",
 	"dgrid/Editor",
@@ -36,24 +36,24 @@ define([
 	"dgrid/Selection",
 	"dgrid/util/touch",
 	"dgrid/extensions/DijitRegistry",
-	
+
 	"dforma/Builder",
 	"dforma/Grid",
 	"dforma/DateTimeTextBox",
 	"dforma/RadioGroup",
-	
+
 	"./util/load-css",
 	"./Uploader",
 	"dojo/sniff"
 ],
-	function(declare, lang, array, has, dom, domConstruct, domClass, domGeometry, domForm, on, query, request, locale, cookie, 
+	function(declare, lang, array, has, dom, domConstruct, domClass, domGeometry, domForm, on, query, request, locale, cookie,
 			Memory, Cache, Rest, DstoreAdapter,
-			ContentPane, LayoutContainer, StackContainer, Toolbar, ToolbarSeparator, Dialog, Button, CheckBox, FilteringSelect,  
-			OnDemandGrid, OnDemandList, Editor, Keyboard, Selection, touchUtil, DijitRegistry, 
+			ContentPane, LayoutContainer, StackContainer, Toolbar, ToolbarSeparator, Dialog, Button, CheckBox, FilteringSelect,
+			OnDemandGrid, OnDemandList, Editor, Keyboard, Selection, touchUtil, DijitRegistry,
 			Builder, Grid, DateTimeTextBox, RadioGroup,
 			loadCss, Uploader) {
-	
-	
+
+
 		if(has("ie") < 9) {
 			lang.extend(Array, {
 				indexOf: function(x){
@@ -70,7 +70,7 @@ define([
 				}
 			});
 		}
-		
+
 		var util = {
 			confirm: function(title, message, callback) {
 				// console.debug("create new Dialog");
@@ -91,7 +91,7 @@ define([
 					callbackToExecute();
 				}));
 				div.appendChild(okButton.domNode);
-	
+
 				var cancelButton = new Button({
 					label: "No"
 				});
@@ -103,7 +103,7 @@ define([
 				div.appendChild(cancelButton.domNode);
 				dialog.show();
 			},
-	
+
 			message: function(title, message, label, callback) {
 				if (!label || typeof label == "function") {
 					callback = label;
@@ -134,7 +134,7 @@ define([
 				div.appendChild(closeButton.domNode);
 				dialog.show();
 			},
-	
+
 			input: function(title, message, controls, callback) {
 				var dialog = new Dialog({
 					title: title
@@ -170,28 +170,36 @@ define([
 				dialog.show();
 			}
 		};
-		
-		function formatTimestamp(value) {  
-			var inputDate = new Date(value);  
+
+		function formatTimestamp(value) {
+			var inputDate = new Date(value);
 			return dojo.date.locale.format(inputDate, {
 				selector:"date",
 				datePattern:"MMMM dd yyyy HH:mm:ss"
-			});  
+			});
 		}
-		
+
 		var selection = [];
-		
+
 		return declare("dexist.CollectionBrowser", [StackContainer], {
 			store: null,
 			grid: null,
 			target:"",
+			collectionRoot:"/db",
 			collection: "/db",
 			clipboard: null,
 			clipboardCut: false,
 			editor: null,
+			editable:true,
+			showPermissions:true,
+			useDialog:false,
 			tools:null,
+			useTools:true,
+			useRangeHeaders:true,
 			thumbnailSize:has("touch") ? 4 : 2,
 			sort:"+internetMediaType",
+			filter:null,
+			selectionMode:"extended",
 			display:has("touch") ? "tiles" : "details",
 			persist:true,
 			baseClass:"dexistCollectionBrowser",
@@ -199,7 +207,7 @@ define([
 			updateBreadcrumb:function() {
 				var self = this;
 				this.breadcrumb.innerHTML = "";
-				var rootCount = this.rootId.split("/").length;
+				var rootCount = this.rootId.split("/").length - 2;//  - 2 FIXME for each slash in collectionRoot
 				this.collection.split("/").forEach(function(part,i,parts){
 					if(!part || i<=rootCount) return;
 					domConstruct.create("a",{
@@ -223,9 +231,9 @@ define([
 				}
 				var files = ["xml","xhtml+xml","xquery","json","css","xslt+xml","xml-dtd","html","x-javascript","octet-stream"];
 				var thumb = item.thumbnail ? this.target+"thumb"+item.thumbnail :
-					base+"/"+(item.isCollection ? "collection" : 
-						files.indexOf(ext)>-1 ? ext : 
-							files.indexOf(sub)>-1 ? sub : 
+					base+"/"+(item.isCollection ? "collection" :
+						files.indexOf(ext)>-1 ? ext :
+							files.indexOf(sub)>-1 ? sub :
 								sup =="image" ? "img" : "generic")+".png";
 				return "<img title=\""+value+"\" class=\"thumbnail\" src=\""+thumb+"\"/>";
 			},
@@ -250,7 +258,7 @@ define([
 							p.resize();
 						}
 					}),250);
-				}));	
+				}));
 				this.grid.on(".dgrid-row:dblclick", lang.hitch(this,"_gridDblClick"));
 				this.grid.on(touchUtil.selector(".dgrid-row", touchUtil.dbltap), lang.hitch(this,"_gridDblClick"));
 				this.grid.on("dgrid-select", lang.hitch(this,"_gridSelect"));
@@ -278,7 +286,7 @@ define([
 				var row = this.grid.row(ev);
 				var item = row.data;
 				if(item.isCollection) {
-					this.refresh("/db/"+item.id);
+					this.refresh(this.collectionRoot+item.id);
 				} else {
 					this.onSelectResource(item.id,item,ev);
 				}
@@ -293,7 +301,10 @@ define([
 					region:"center",
 					"class":"browsingList",
 					sort:sort,
-					collection: this.store.filter({collection:this.collection}),
+					//query:this.filter,
+					selectionMode:this.selectionMode,
+					showFooter: this.useDialog,
+					collection: this.store.filter(lang.mixin({collection:this.collection},this.filter)),
 					farOffRemoval: 500,
 					renderRow: lang.hitch(this,function(object){
 						var thumb = this.formatMediaType(object.internetMediaType,object);
@@ -309,30 +320,39 @@ define([
 					region:"center",
 					"class":"browsingGrid",
 					sort:sort,
-					collection: this.store.filter({collection:this.collection}),
+					selectionMode:this.selectionMode,
+					showFooter: this.useDialog,
+					query:this.filter,
+					collection:  this.store.filter(lang.mixin({collection:this.collection},this.filter)),
 					columns: [{
-						label: "ℹ",
+						label: "ⓘ",
 						field: "internetMediaType",
-						renderHeaderCell: function(node) {
+						/*renderHeaderCell: function(node) {
 							return domConstruct.create('img',{
 								src:require.toUrl("dexist/resources/images/info.svg")
 							});
-						},
+						},*/
 						formatter:lang.hitch(this,"formatMediaType")
 					},{
 						label: "Name",
 						field: "name",
 						editor: "text",
-						editOn: "click"
+						editOn: "click",
+						canEdit:lang.hitch(function(){
+							this.editable = true;
+						})
 					},{
 						label: "Permissions",
-						field: "permissionsString"
+						field: "permissionsString",
+						hidden: !this.showPermissions
 					},{
 						label: "Owner",
-						field: "owner"
+						field: "owner",
+						hidden: !this.showPermissions
 					},{
 						label: "Group",
-						field: "group"
+						field: "group",
+						hidden: !this.showPermissions
 					},{
 						label: "Last-modified",
 						field: "lastModified",
@@ -500,12 +520,36 @@ define([
 				);
 			},
 			updateToolbar:function(len){
+				if(!this.useTools) return;
 				var disable = ["properties","delete","copy","cut"];
 				for(var k in this.tools) {
 					if(disable.indexOf(k)>-1){
 						this.tools[k].set("disabled",len===0);
 					}
 				}
+			},
+			_renderDialog:function(){
+				this.okButton = new Button({
+					label:"OK",
+					onClick:lang.hitch(this,function(evt){
+						this.onSubmit(this.getSelected(),evt);
+					})
+				});
+				this.cancelButton = new Button({
+					label:"Cancel",
+					onClick:lang.hitch(this,function(evt){
+						var sel = this.getSelected();
+						this.onCancel(evt);
+					})
+				});
+				this.cancelButton.placeAt(this.grid.footerNode);
+				this.okButton.placeAt(this.grid.footerNode);
+			},
+			onSubmit:function(sel,evt){
+
+			},
+			onCancel:function(evt){
+
 			},
 			startup: function() {
 				if(this._started) return;
@@ -517,13 +561,13 @@ define([
 				}
 				if(this.rootId) {
 					if(this.collection.substr(4,this.rootId.length)!=this.rootId){
-						this.collection = "/db/"+this.rootId;
-					}					
+						this.collection = this.collectionRoot+this.rootId;
+					}
 				}
 				var self = this;
-				
+
 				loadCss(require.toUrl("dexist/resources/CollectionBrowser.css"));
-				
+
 				this.browsingPage = new LayoutContainer({
 				});
 				this.propertiesPage = new ContentPane({
@@ -532,15 +576,15 @@ define([
 					region:"top"
 				});
 				this.browsingPage.addChild(this.browsingTop);
-				this._renderToolBar();
+				if(this.useTools) this._renderToolBar();
 				this.breadcrumb = domConstruct.create("div",{
 					"class":"breadcrumb"
 				},this.browsingTop.domNode,"last");
 				this.updateBreadcrumb();
 				// json data store
 				this.store = new Rest({
-					useRangeHeaders:true,
-					target:this.target+"db/",
+					useRangeHeaders:this.useRangeHeaders,
+					target:this.target,
 					rpc:function(id,method,params,callId){
 						callId = callId || "call-id";
 						return request.post(this.target+id,{
@@ -562,6 +606,7 @@ define([
 				} else {
 					this._renderList();
 				}
+				if(this.useDialog) this._renderDialog();
 				this.addChild(this.browsingPage);
 				this.addChild(this.propertiesPage);
 				this._connectGrid();
@@ -577,7 +622,7 @@ define([
 					}
 				});
 				this.uploadDlg.containerNode.appendChild(this.uploader.domNode);
-				
+
 				this.form = new Builder({
 					cancellable:true,
 					cancel:function(){
@@ -596,9 +641,9 @@ define([
 						});
 					}
 				});
-				
+
 				this.propertiesPage.addChild(this.form);
-				
+
 				// resizing and grid initialization after plugin becomes visible
 				this.grid.focus();
 				this.inherited(arguments);
@@ -629,7 +674,7 @@ define([
 					this.collection = collection;
 					this.updateBreadcrumb();
 				}
-				this.grid.set("collection",this.store.filter({collection:this.collection}));
+				this.grid.set("collection", this.store.filter(lang.mixin({collection:this.collection},this.filter)));
 			},
 			_buildPropertiesForm:function(){
 				if(!selection.length) return;
@@ -716,27 +761,27 @@ define([
 								field: "target",
 								width: "20%"
 							},{
-								label: "Subject", 
-								field: "who", 
+								label: "Subject",
+								field: "who",
 								width: "30%"
 							},{
 								label: "Access Type",
-								field: "access_type", 
+								field: "access_type",
 								width: "20%"
 							},{
-								label: "Read", 
-								field: "read", 
-								width: "10%", 
+								label: "Read",
+								field: "read",
+								width: "10%",
 								editor: "checkbox"
 							},{
-								label: "Write", 
-								field: "write", 
-								width: "10%", 
+								label: "Write",
+								field: "write",
+								width: "10%",
 								editor: "checkbox"
 							},{
-								label: "Execute", 
-								field: "execute", 
-								width: "10%", 
+								label: "Execute",
+								field: "execute",
+								width: "10%",
 								editor: "checkbox"
 							}],
 							schema:{
@@ -825,7 +870,7 @@ define([
 				util.input("Create Collection", "Create a new collection",
 					"<label for='name'>Name:</label><input type='text' name='name'/>",
 					function(value) {
-						var id = self.collection.replace(/^\/db\/?/,"");
+						var id = self.collection.replace(new RegExp("^"+this.collectionRoot+"/?"),"");
 						self.store.rpc(id,"create-collection",[value.name]).then(function() {
 							self.refresh();
 						},function(err) {
@@ -854,7 +899,7 @@ define([
 				this.tools["paste"].set("disabled",true);
 				if(this.clipboard && this.clipboard.length > 0) {
 					console.log("Paste: %d resources", this.clipboard.length);
-					var id = this.collection.replace(/^\/db\/?/,"");
+					var id = this.collection.replace(new RegExp("^"+this.collectionRoot+"/?"),"");
 					var mthd = this.clipboardCut ? "move-resources" : "copy-resources";
 					this.store.rpc(id,mthd,[this.clipboard]).then(lang.hitch(this,function(){
 						this.clipboard = null
@@ -873,7 +918,7 @@ define([
 			},
 			_reindex: function() {
 				var self = this;
-				var id = this.collection.replace(/^\/db\/?/,"");
+				var id = this.collection.replace(new RegExp("^"+this.collectionRoot+"/?"),"");
 				var resources = this.getSelected(true);
 				if (resources && resources.length > 0) {
 					if (resources.length > 1) {
@@ -882,25 +927,25 @@ define([
 					}
 					id = resources[0];
 				}
-				util.confirm("Reindex collection?", 
-					"Are you sure you want to reindex collection /db/" + id + "?",
+				util.confirm("Reindex collection?",
+					"Are you sure you want to reindex collection "+this.collectionRoot+"/" + id + "?",
 				function() {
 					self.store.rpc(id,"reindex").then(function() {
 						self.refresh();
 					},function() {
-						util.message("Reindex Failed!", "Reindex of collection /db/" + id + " failed");
+						util.message("Reindex Failed!", "Reindex of collection "+this.collectionRoot+"/" + id + " failed");
 						self.refresh();
 					});
 				});
 			},
 			onSelectResource:function(id,item,evt){
 				// override this to connect to double-click
-				this.openResource("/db/"+id);
+				this.openResource(this.collectionRoot+id);
 			},
 			openResource: function(path) {
 				var exide = window.open("", "eXide");
 				if(exide && !exide.closed) {
-					
+
 					// check if eXide is really available or it's an empty page
 					var app = exide.eXide;
 					if (app) {
